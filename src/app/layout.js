@@ -1,3 +1,4 @@
+import { Toaster } from "@/components/ui/sonner";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -18,12 +19,13 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      {/*Antialiased -> smooths text rendering, making fonts look cleaner and less jagged on screen. */}
+    <html lang="en" className="white">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/* <NavigationMenuDemo /> */}
         {children}
+        <Toaster position="bottom-right" richColors />
       </body>
     </html>
   );

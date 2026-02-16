@@ -1,8 +1,10 @@
 // This is the root page of the app "/"
-
-import Image from "next/image";
-import { redirect } from "next/navigation";
-
+import NavigationMenuDemo from "@/components/navbar";
+import Landing from "./(not-protected)/landing/page";
 export default function Home() {
-  return redirect("/landing");
+  return (
+    <>
+      <NavigationMenuDemo /> <Landing />
+    </>
+  );
 }

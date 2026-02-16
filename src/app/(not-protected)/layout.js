@@ -1,9 +1,9 @@
-import Navbar from "@/components/navbar";
+import NavigationMenuDemo from "@/components/navbar";
 
 export default function NotProtectedLayout({ children }) {
   return (
     <>
-      <Navbar />
+      <NavigationMenuDemo />
       {children}
     </>
   );
