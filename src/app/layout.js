@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,15 +18,23 @@ export const metadata = {
   description: "Convert you Website into AI Powered chatbot",
 };
 
+import { AuthProvider } from "@/context/AuthContext";
+import SessionClearer from "@/components/SessionClearer";
+
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className="white">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* <NavigationMenuDemo /> */}
-        {children}
-        <Toaster position="bottom-right" richColors />
+        <SessionClearer />
+        <AuthProvider>
+          <TooltipProvider>
+            {/* <NavigationMenuDemo /> */}
+            {children}
+            <Toaster position="bottom-right" richColors />
+          </TooltipProvider>
+        </AuthProvider>
       </body>
     </html>
   );

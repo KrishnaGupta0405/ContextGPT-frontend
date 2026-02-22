@@ -16,7 +16,10 @@ import {
   CircleAlertIcon,
   CircleCheckIcon,
   CircleDashedIcon,
+  LogOut,
+  LayoutDashboard,
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const components = [
   {
@@ -57,6 +60,7 @@ const components = [
 ];
 
 export default function NavigationMenuDemo() {
+  const { user, logout } = useAuth();
   const [isVisible, setIsVisible] = React.useState(true);
   const [lastScrollY, setLastScrollY] = React.useState(0);
 
@@ -83,7 +87,7 @@ export default function NavigationMenuDemo() {
   return (
     <div
       className={cn(
-        "bg-background/80 border-border fixed top-0 right-0 left-0 z-50 border-b shadow-sm backdrop-blur-md transition-transform duration-300 ease-in-out",
+        "bg-background/80 border-border top-0 right-0 left-0 z-50 border-b shadow-sm backdrop-blur-md transition-transform duration-300 ease-in-out",
         isVisible ? "translate-y-0" : "-translate-y-full",
       )}
     >
@@ -205,13 +209,32 @@ export default function NavigationMenuDemo() {
           </NavigationMenuList>
         </NavigationMenu>
 
-        <div className="flex items-center">
-          <Link
-            href="/login"
-            className="bg-primary text-primary-foreground rounded-lg border border-transparent px-4 py-2 text-sm font-medium transition-all hover:opacity-90"
-          >
-            Login
-          </Link>
+        <div className="flex items-center gap-3">
+          {user ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-lg border border-transparent px-4 py-2 text-sm font-medium transition-all"
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Dashboard
+              </Link>
+              <button
+                onClick={logout}
+                className="hover:bg-accent hover:text-accent-foreground text-muted-foreground flex items-center gap-2 rounded-lg border border-transparent px-4 py-2 text-sm font-medium transition-all"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="bg-primary text-primary-foreground rounded-lg border border-transparent px-4 py-2 text-sm font-medium transition-all hover:opacity-90"
+            >
+              Login
+            </Link>
+          )}
         </div>
       </div>
     </div>

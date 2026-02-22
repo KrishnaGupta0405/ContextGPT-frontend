@@ -18,10 +18,11 @@ import { FieldSeparator } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
 import { Chrome, Eye, EyeOff } from "lucide-react";
 import { CustomBreadcrumb } from "@/components/ui/CustomBreadcrumb";
-import api from "@/axios";
+import api from "@/lib/axios";
 import { toast } from "sonner";
 import LoadingIndicator from "@/components/ui/LoadingIndicator";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 const loginSchema = z.object({
   email: z
@@ -34,6 +35,7 @@ const loginSchema = z.object({
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const loadingBarRef = React.useRef(null);
   const [showPassword, setShowPassword] = React.useState(false);
   const {
@@ -55,6 +57,11 @@ export default function LoginPage() {
     try {
       const response = await api.post("/auth/login", data);
       console.log("Login response:", response);
+
+      // Update global auth state
+      const { user, account } = response.data.data;
+      login(user, account);
+
       toast.success("Logged in successfully!", {
         id: toastId,
         // description: "Login successfull",
@@ -64,7 +71,7 @@ export default function LoginPage() {
       // push the router after 2.5 seconds
       setTimeout(() => {
         loadingBarRef.current.complete();
-        router.push("/dashboard");
+        router.push("/select-chatbot");
       }, 2500);
     } catch (error) {
       loadingBarRef.current.complete();

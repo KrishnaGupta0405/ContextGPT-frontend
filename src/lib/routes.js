@@ -8,4 +8,12 @@ export const ROUTES = {
   Features: "/features",
   Integration: "/integration",
   Pricing: "/pricing",
+  "Chat History": "/chat-history",
+  "Custom Responses": "/custom-responses",
+  "Files Sources": "/files-sources",
+  "SDK Advanced": "/installation/sdk-advanced",
+  "Website Integration": "/installation/website-integration",
+  Leads: "/leads",
+  "Text Snippets": "/text-snippets",
+  "Website Links": "/website-links",
 };

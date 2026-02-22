@@ -1,7 +1,11 @@
-import React from "react";
+import { AppSidebar } from "./app-sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
-const sidebar = () => {
-  return <div>sidebar</div>;
-};
-
-export default sidebar;
+export default function Sidebar({ children }) {
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>{children}</SidebarInset>
+    </SidebarProvider>
+  );
+}
