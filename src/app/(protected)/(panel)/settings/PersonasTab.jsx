@@ -44,37 +44,40 @@ const DEFAULT_PERSONAS = [
   },
   {
     title: "Neutral",
-    description: null,
+    description: "Balanced, unbiased, and fact-focused communication",
     instructions:
       "Maintain a neutral tone in all responses, presenting information objectively and factually without expressing personal opinions, emotions, or bias. Use straightforward language to convey details clearly and impartially.",
   },
   {
     title: "Professional / Formal",
-    description: null,
+    description:
+      "Polished, respectful language suitable for business or academic contexts",
     instructions:
       "Adopt a professional and formal tone in all responses, using polished, respectful language suitable for business or academic contexts. Structure answers with clarity, precision, and etiquette, avoiding contractions, slang, or casual expressions.",
   },
   {
     title: "Informative",
-    description: null,
+    description:
+      "Detailed and educational responses focused on clarity and understanding",
     instructions:
       "Focus on an informative tone in all responses, prioritizing the delivery of accurate, detailed, and educational content. Explain concepts thoroughly, use examples where helpful, and organize information logically to enhance understanding.",
   },
   {
     title: "Engaging",
-    description: null,
+    description: "Conversational and interactive responses that hold attention",
     instructions:
       "Use an engaging tone in all responses, drawing the user in with conversational language, questions, or relatable anecdotes to make interactions dynamic and interactive. Encourage curiosity while keeping the content lively and user-focused.",
   },
   {
     title: "Inspirational",
-    description: null,
+    description: "Positive and uplifting responses that motivate and encourage",
     instructions:
       "Employ an inspirational tone in all responses, motivating and uplifting the user with positive, encouraging language. Highlight potential, growth, and optimism, weaving in motivational insights to inspire action or reflection.",
   },
   {
     title: "Playful / Funny",
-    description: null,
+    description:
+      "Light-hearted and humorous responses that entertain and amuse",
     instructions:
       "Respond in a playful and funny tone, incorporating light-hearted humor, puns, or witty remarks where appropriate to keep things fun and entertaining. Balance jokes with relevance to ensure the response remains helpful and enjoyable.",
   },
@@ -158,14 +161,31 @@ const PersonaCard = ({
 
         {/* Content */}
         <div className="flex-1">
-          <div className="text-[15px] font-semibold text-gray-900">
-            {persona.title}
-          </div>
-          {persona.description && (
-            <div className="mt-1 text-sm text-gray-500">
-              {persona.description}
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-[15px] font-semibold text-gray-900">
+                {persona.title}
+              </div>
+              {persona.description && (
+                <div className="mt-1 text-sm text-gray-500">
+                  {persona.description}
+                </div>
+              )}
             </div>
-          )}
+            {persona.deletable && onDelete && (
+              <button
+                type="button"
+                className="p-2 text-gray-400 transition-colors hover:text-red-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(persona);
+                }}
+                title="Delete persona"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            )}
+          </div>
 
           <button
             type="button"
@@ -206,16 +226,6 @@ const PersonaCard = ({
                   >
                     Edit Persona
                   </Button>
-                  {persona.deletable && onDelete && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      className="h-8 font-medium"
-                      onClick={() => onDelete(persona)}
-                    >
-                      <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
-                    </Button>
-                  )}
                 </div>
               )}
             </div>
@@ -375,19 +385,58 @@ const PersonasTab = () => {
       );
 
       if (response.data.success) {
-        toast.success("Persona deleted");
+        toast.success(response.data.message || "Persona deleted");
         if (selectedPersonaId === persona.id) {
           setSelectedPersonaId(defaultList[0]?.id);
         }
         fetchPersonas(selectedPersonaId);
       }
     } catch (error) {
-      toast.error("Failed to delete persona");
+      toast.error(error.response?.data?.message || "Failed to delete persona");
     }
   };
 
   const handleSaveChanges = async () => {
-    toast.success("Persona selection saved!");
+    if (!selectedPersonaId) {
+      toast.error("Please select a persona first");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const chatbotId = selectedChatbot.id || selectedChatbot.chatbotId;
+      const account = JSON.parse(localStorage.getItem("account") || "{}");
+      const accountId = account?.id;
+
+      const selectedPersona = personas.find((p) => p.id === selectedPersonaId);
+
+      const payload = {
+        title: selectedPersona.title,
+        description: selectedPersona.description || "",
+        instructions: selectedPersona.instructions || "",
+        creativityLevel: Number(selectedPersona.creativityLevel || 0.7),
+      };
+
+      // Only include personaId if it's not a default persona
+      if (!isDefaultPersona(selectedPersona)) {
+        payload.personaId = selectedPersona.id;
+      }
+
+      const response = await api.post(
+        `/chatbots/account/${accountId}/chatbot/${chatbotId}/personas/select-persona`,
+        payload,
+      );
+
+      if (response.data.success) {
+        toast.success(response.data.message || "Persona selection saved!");
+      }
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Failed to save persona selection",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (initialLoading) {
@@ -402,7 +451,7 @@ const PersonasTab = () => {
     <div className="max-w-5xl pb-24">
       {/* Default Personas Section */}
       <div className="grid grid-cols-1 gap-8 border-b border-gray-100 py-10 md:grid-cols-4">
-        <div className="pr-6 md:col-span-1">
+        <div className="pr-6 md:sticky md:top-14 md:col-span-1 md:self-start">
           <h3 className="text-base font-semibold text-gray-900">
             Default Personas
           </h3>
@@ -431,7 +480,7 @@ const PersonasTab = () => {
 
       {/* Custom Personas Section */}
       <div className="grid grid-cols-1 gap-8 py-10 md:grid-cols-4">
-        <div className="pr-6 md:col-span-1">
+        <div className="pr-6 md:sticky md:top-14 md:col-span-1 md:self-start">
           <h3 className="text-base font-semibold text-gray-900">
             Custom Personas
           </h3>
@@ -598,12 +647,14 @@ const PersonasTab = () => {
         </div>
       </div>
 
-      {/* Global Save Button Container */}
+      {/*Save Button Container */}
       <div className="fixed right-0 bottom-0 left-[240px] z-10 flex justify-end border-t border-gray-200 bg-white p-4">
         <Button
           onClick={handleSaveChanges}
+          disabled={loading}
           className="h-10 rounded-md bg-blue-600 px-8 font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
         >
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Save Changes
         </Button>
       </div>

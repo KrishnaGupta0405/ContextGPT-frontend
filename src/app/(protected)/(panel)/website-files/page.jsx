@@ -42,7 +42,7 @@ import { useChatbot } from "@/context/ChatbotContext";
 import api from "@/lib/axios";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
-import { AddLinksModal } from "./AddLinksModal";
+import { AddFilesModal } from "./AddFilesModal";
 
 const TABS = [
   {
@@ -111,7 +111,7 @@ const WebsiteLinks = () => {
     }
 
     const headers = [
-      "url",
+      "file",
       "linkType",
       "status",
       "title",
@@ -205,12 +205,12 @@ const WebsiteLinks = () => {
       if (status) params.status = status;
 
       const response = await api.get(
-        `/ingestion/account/${accountId}/chatbot/${chatbotId}/links`,
+        `/ingestion/account/${accountId}/chatbot/${chatbotId}/files`,
         { params },
       );
 
       if (response.data?.success) {
-        setFiles(response.data.data.links);
+        setFiles(response.data.data.files);
         setTotalFiles(response.data.data.total);
 
         // Update the mock stat total for current tab
@@ -330,7 +330,7 @@ const WebsiteLinks = () => {
                 className="border-0 bg-[#8392ab] text-white hover:bg-[#6e7d96]"
                 onClick={() => setIsAddModalOpen(true)}
               >
-                <Plus className="mr-2 h-4 w-4" /> Add Links
+                <Plus className="mr-2 h-4 w-4" /> Add Files
               </Button>
             </div>
           </div>
@@ -702,14 +702,6 @@ const WebsiteLinks = () => {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 hover:text-slate-600"
-                                  onClick={() =>
-                                    window.open(
-                                      file.metadata?.sourceUrl ||
-                                        file.fileName ||
-                                        "#",
-                                      "_blank",
-                                    )
-                                  }
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
@@ -722,7 +714,6 @@ const WebsiteLinks = () => {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 hover:text-slate-600"
-                                  onClick={() => setIsAddModalOpen(true)}
                                 >
                                   <Wrench className="h-4 w-4" />
                                 </Button>
@@ -764,7 +755,7 @@ const WebsiteLinks = () => {
           </div>
         </div>
       </div>
-      <AddLinksModal isOpen={isAddModalOpen} onClose={setIsAddModalOpen} />
+      <AddFilesModal isOpen={isAddModalOpen} onClose={setIsAddModalOpen} />
     </TooltipProvider>
   );
 };

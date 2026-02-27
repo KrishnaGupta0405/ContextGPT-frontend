@@ -81,25 +81,29 @@ const InstructionCard = ({
             </div>
 
             {/* Action Buttons for Custom Instructions */}
-            {instruction.title !== "None" && onEdit && onDelete && (
+            {instruction.title !== "None" && (onEdit || onDelete) && (
               <div
                 className="flex items-center gap-2"
                 onClick={(e) => e.stopPropagation()}
               >
-                <button
-                  type="button"
-                  onClick={() => onEdit(instruction)}
-                  className="p-1 text-gray-400 transition-colors hover:text-gray-700"
-                >
-                  <Edit2 className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(instruction)}
-                  className="p-1 text-red-400 transition-colors hover:text-red-600"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(instruction)}
+                    className="p-1 text-gray-400 transition-colors hover:text-gray-700"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                )}
+                {onDelete && instruction.deletable !== false && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(instruction)}
+                    className="p-1 text-red-400 transition-colors hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -162,9 +166,6 @@ const InstructionsTab = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  const [fallbackMessage, setFallbackMessage] = useState("");
-  const [savingFallback, setSavingFallback] = useState(false);
-
   const [isEditingCustom, setIsEditingCustom] = useState(false);
   const [editingInstructionId, setEditingInstructionId] = useState(null);
 
@@ -176,11 +177,6 @@ const InstructionsTab = () => {
   useEffect(() => {
     if (selectedChatbot?.id || selectedChatbot?.chatbotId) {
       fetchInstructions();
-      // Fetch fallback message from localization or general settings if needed
-      // Mocking fallback message load for now:
-      setFallbackMessage(
-        "I'm sorry, I don't have enough information to answer your question, but I'm happy to assist with any other questions you may have.",
-      );
     }
   }, [selectedChatbot]);
 
@@ -192,55 +188,43 @@ const InstructionsTab = () => {
       const accountId = account?.id;
       if (!accountId) throw new Error("Account ID missing");
 
-      // Replace with actual API call to Instructions endpoint
       const response = await api.get(
-        `/chatbots/account/${accountId}/chatbot/${chatbotId}/instruction`,
+        `/chatbots/account/${accountId}/chatbot/${chatbotId}/instructions`,
       );
 
       if (response.data.success) {
-        let fetchedInstructions = response.data.data || [];
-        // Ensure it's an array. If backend returns single object for some reason, wrap it.
-        if (!Array.isArray(fetchedInstructions)) {
-          fetchedInstructions = [fetchedInstructions];
-        }
+        let fetched = response.data.data || [];
+        if (!Array.isArray(fetched)) fetched = [fetched];
 
-        setInstructions(fetchedInstructions);
+        // Only keep custom (deletable) for the list
+        const customInstructions = fetched.filter((i) => i.deletable === true);
+        setInstructions(customInstructions);
 
-        // Pre-select logic
-        if (selectId) setSelectedInstructionId(selectId);
-        else if (
-          selectedInstructionId === "default-none" &&
-          fetchedInstructions.length > 0
-        ) {
-          // If they have custom ones and none is selected, don't auto-select unless intended.
-          // We'll leave it as "default-none" unless logic dictates otherwise
+        // Smart active detection (same logic as personas)
+        const activeDefault = fetched.find(
+          (i) => i.deletable === false && i.isActive === true,
+        );
+        const activeCustom = fetched.find(
+          (i) => i.deletable === true && i.isActive === true,
+        );
+
+        if (selectId) {
+          setSelectedInstructionId(selectId);
+        } else if (activeDefault) {
+          setSelectedInstructionId("default-none"); // ← shows "None" as active
+        } else if (activeCustom) {
+          setSelectedInstructionId(activeCustom.id);
+        } else {
+          setSelectedInstructionId("default-none");
         }
       }
     } catch (error) {
       console.error("Failed to fetch instructions", error);
-      // Suppress 404 error toast specifically as it implies "none created yet" based on controller
       if (error.response?.status !== 404) {
         toast.error("Failed to load instructions");
       }
     } finally {
       setInitialLoading(false);
-    }
-  };
-
-  const handleSaveFallbackMessage = async () => {
-    setSavingFallback(true);
-    try {
-      // Mocking save for Fallback Message
-      // const chatbotId = selectedChatbot.id || selectedChatbot.chatbotId;
-      // const accountId = JSON.parse(localStorage.getItem("account") || "{}")?.id;
-      // await api.patch(`/chatbot/account/${accountId}/chatbot/${chatbotId}`, { fallbackMessage });
-
-      // Network delay mock
-      toast.success("Backend route not configured yet");
-    } catch (error) {
-      toast.error("Failed to save fallback message");
-    } finally {
-      setSavingFallback(false);
     }
   };
 
@@ -283,19 +267,22 @@ const InstructionsTab = () => {
       let response;
       if (!editingInstructionId) {
         response = await api.post(
-          `/chatbots/account/${accountId}/chatbot/${chatbotId}/instruction`,
+          `/chatbots/account/${accountId}/chatbot/${chatbotId}/instructions`,
           payload,
         );
       } else {
         response = await api.patch(
-          `/chatbots/account/${accountId}/chatbot/${chatbotId}/instruction?instructionId=${editingInstructionId}`,
+          `/chatbots/account/${accountId}/chatbot/${chatbotId}/instructions/${editingInstructionId}`,
           payload,
         );
       }
 
       if (response.data.success) {
         toast.success(
-          editingInstructionId ? "Instruction updated" : "Instruction created",
+          response.data.message ||
+            (editingInstructionId
+              ? "Instruction updated"
+              : "Instruction created"),
         );
         const newId = response.data.data?.id;
         setIsEditingCustom(false);
@@ -319,23 +306,76 @@ const InstructionsTab = () => {
       const account = JSON.parse(localStorage.getItem("account") || "{}");
 
       const response = await api.delete(
-        `/chatbots/account/${account.id}/chatbot/${chatbotId}/instruction?instructionId=${instruction.id}`,
+        `/chatbots/account/${account.id}/chatbot/${chatbotId}/instructions?instructionId=${instruction.id}`,
       );
 
       if (response.data.success) {
-        toast.success("Instruction deleted");
+        toast.success(response.data.message || "Instruction deleted");
         if (selectedInstructionId === instruction.id) {
           setSelectedInstructionId("default-none");
         }
-        fetchInstructions(selectedInstructionId);
+        fetchInstructions(
+          selectedInstructionId === instruction.id
+            ? "default-none"
+            : selectedInstructionId,
+        );
       }
     } catch (error) {
-      toast.error("Failed to delete instruction");
+      toast.error(
+        error.response?.data?.message || "Failed to delete instruction",
+      );
     }
   };
 
   const handleSaveChanges = async () => {
-    toast.success("Active instruction selection saved!");
+    setLoading(true);
+    try {
+      const chatbotId = selectedChatbot.id || selectedChatbot.chatbotId;
+      const account = JSON.parse(localStorage.getItem("account") || "{}");
+      const accountId = account?.id;
+
+      let payload = {};
+
+      if (selectedInstructionId === "default-none") {
+        payload = {
+          title: "Default Intruction",
+          instruction: "No custom instructions – use default AI behavior.",
+          creativityLevel: 0.5,
+        };
+      } else {
+        const selectedInstruction = instructions.find(
+          (i) => i.id === selectedInstructionId,
+        );
+        if (!selectedInstruction) {
+          toast.error("Please select an instruction first");
+          setLoading(false);
+          return;
+        }
+        payload = {
+          instructionId: selectedInstruction.id,
+          title: selectedInstruction.title,
+          instruction: selectedInstruction.instruction || "",
+          creativityLevel: Number(selectedInstruction.creativityLevel || 0.7),
+        };
+      }
+
+      const response = await api.post(
+        `/chatbots/account/${accountId}/chatbot/${chatbotId}/instructions/select-instruction`,
+        payload,
+      );
+
+      if (response.data.success) {
+        toast.success(
+          response.data.message || "Active instruction selection saved!",
+        );
+      }
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Failed to save instruction selection",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (initialLoading) {
@@ -348,44 +388,6 @@ const InstructionsTab = () => {
 
   return (
     <div className="max-w-5xl pb-24">
-      {/* Fallback Message Section */}
-      <div className="grid grid-cols-1 gap-8 border-b border-gray-100 py-10 md:grid-cols-4">
-        <div className="pr-6 md:col-span-1">
-          <h3 className="text-base font-semibold text-gray-900">
-            Fallback Message
-          </h3>
-          <p className="mt-2 text-[14px] leading-relaxed text-gray-500">
-            Customize the message shown when the chatbot can't find relevant
-            information to answer a question.
-          </p>
-        </div>
-
-        <div className="w-full md:col-span-3">
-          <div className="mb-2 text-[13px] font-semibold text-gray-900">
-            Fallback Message
-          </div>
-          <Textarea
-            value={fallbackMessage}
-            onChange={(e) => setFallbackMessage(e.target.value)}
-            className="mb-2 min-h-[100px] resize-none text-[14px] shadow-sm"
-          />
-          <div className="mb-4 text-[13px] text-gray-500">
-            This message will be shown when the chatbot cannot find relevant
-            information to answer a user's question.
-          </div>
-          <Button
-            onClick={handleSaveFallbackMessage}
-            disabled={savingFallback}
-            className="h-9 bg-blue-600 px-4 text-sm font-medium shadow-sm transition-colors hover:bg-blue-700"
-          >
-            {savingFallback && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Save Fallback Message
-          </Button>
-        </div>
-      </div>
-
       {/* Default Instructions Section */}
       <div className="grid grid-cols-1 gap-8 border-b border-gray-100 py-10 md:grid-cols-4">
         <div className="pr-6 md:col-span-1">
@@ -563,13 +565,17 @@ const InstructionsTab = () => {
       </div>
 
       {/* Global Save Button Container */}
-      <div className="fixed right-0 bottom-0 left-[240px] z-10 flex justify-end border-t border-gray-200 bg-white p-4">
-        <Button
-          onClick={handleSaveChanges}
-          className="h-10 rounded-md bg-blue-600 px-8 font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
-        >
-          Save Changes
-        </Button>
+      <div className="fixed right-0 bottom-0 z-10 w-[calc(100%-256px)] border-t bg-white p-4">
+        <div className="flex justify-end px-6">
+          <Button
+            onClick={handleSaveChanges}
+            disabled={loading}
+            className="h-10 rounded-md bg-blue-600 px-8 font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+          >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Changes
+          </Button>
+        </div>
       </div>
     </div>
   );

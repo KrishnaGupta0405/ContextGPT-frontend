@@ -16,8 +16,39 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+
+export const languages = [
+  { code: "en", name: "English", flag: "🇺🇸" },
+  { code: "es", name: "Spanish", flag: "🇪🇸" },
+  { code: "fr", name: "French", flag: "🇫🇷" },
+  { code: "de", name: "German", flag: "🇩🇪" },
+  { code: "zh", name: "Chinese (Mandarin)", flag: "🇨🇳" },
+  { code: "hi", name: "Hindi", flag: "🇮🇳" },
+  { code: "ar", name: "Arabic", flag: "🇸🇦" },
+  { code: "pt", name: "Portuguese", flag: "🇵🇹" },
+  { code: "ru", name: "Russian", flag: "🇷🇺" },
+  { code: "ja", name: "Japanese", flag: "🇯🇵" },
+  { code: "ko", name: "Korean", flag: "🇰🇷" },
+  { code: "it", name: "Italian", flag: "🇮🇹" },
+  { code: "nl", name: "Dutch", flag: "🇳🇱" },
+  { code: "tr", name: "Turkish", flag: "🇹🇷" },
+  { code: "pl", name: "Polish", flag: "🇵🇱" },
+  { code: "vi", name: "Vietnamese", flag: "🇻🇳" },
+  { code: "th", name: "Thai", flag: "🇹🇭" },
+  { code: "id", name: "Indonesian", flag: "🇮🇩" },
+  { code: "sv", name: "Swedish", flag: "🇸🇪" },
+  { code: "da", name: "Danish", flag: "🇩🇰" },
+  { code: "other", name: "Other", flag: "🌐" },
+];
 
 const allFields = [
   "homeTitle",
@@ -77,11 +108,15 @@ const allFields = [
   "inputDisabledPlaceholder",
 ];
 
-const formSchema = z.object(
-  Object.fromEntries(allFields.map((f) => [f, z.string().optional()])),
-);
+const formSchema = z.object({
+  localeCode: z.string().min(1, "Language is required"),
+  ...Object.fromEntries(allFields.map((f) => [f, z.string().optional()])),
+});
 
-const defaultValues = Object.fromEntries(allFields.map((f) => [f, ""]));
+const defaultValues = {
+  localeCode: "en",
+  ...Object.fromEntries(allFields.map((f) => [f, ""])),
+};
 
 // Helper to render a label from a camelCase field name
 const fieldLabel = (name) =>
@@ -89,6 +124,11 @@ const fieldLabel = (name) =>
 
 // Section groups
 const sections = [
+  {
+    title: "Language Setting",
+    description: "Select the primary language for these text settings.",
+    fields: ["localeCode"],
+  },
   {
     title: "Home",
     description: "Home screen text settings",
@@ -219,19 +259,20 @@ const LocalizationTab = () => {
       if (!accountId) throw new Error("Account ID missing");
 
       const response = await api.get(
-        `/chatbot/account/${accountId}/chatbot/${chatbotId}/localization`,
+        `/chatbots/account/${accountId}/chatbot/${chatbotId}/localization`,
       );
 
       if (response.data.success && response.data.data) {
         const dataArr = Array.isArray(response.data.data)
           ? response.data.data
           : [response.data.data];
-        const data = dataArr.find((d) => d.localeCode === "en") || dataArr[0];
+        const data = dataArr[0]; // Fetching primary or top matched mapping
 
         if (data) {
-          form.reset(
-            Object.fromEntries(allFields.map((f) => [f, data[f] || ""])),
-          );
+          form.reset({
+            localeCode: data.localeCode || "en",
+            ...Object.fromEntries(allFields.map((f) => [f, data[f] || ""])),
+          });
           setIsNewRecord(false);
         } else {
           setIsNewRecord(true);
@@ -257,17 +298,17 @@ const LocalizationTab = () => {
       const accountId = account?.id;
       if (!accountId) throw new Error("Account ID missing");
 
-      const payload = { ...values, localeCode: "en" };
+      const payload = { ...values };
 
       let response;
       if (isNewRecord) {
-        response = await api.post(
-          `/chatbot/account/${accountId}/chatbot/${chatbotId}/localization`,
+        response = await api.patch(
+          `/chatbots/account/${accountId}/chatbot/${chatbotId}/localization`,
           payload,
         );
       } else {
         response = await api.patch(
-          `/chatbot/account/${accountId}/chatbot/${chatbotId}/localization`,
+          `/chatbots/account/${accountId}/chatbot/${chatbotId}/localization`,
           payload,
         );
       }
@@ -304,7 +345,7 @@ const LocalizationTab = () => {
               key={section.title}
               className="grid grid-cols-1 gap-8 border-b py-8 md:grid-cols-4"
             >
-              <div className="md:col-span-1">
+              <div className="md:sticky md:top-14 md:col-span-1 md:self-start">
                 <h3 className="text-lg font-bold text-slate-900">
                   {section.title}
                 </h3>
@@ -322,14 +363,64 @@ const LocalizationTab = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-semibold text-slate-700">
-                          {fieldLabel(name)}
+                          {name === "localeCode"
+                            ? "Language"
+                            : fieldLabel(name)}
                         </FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder={fieldLabel(name)}
-                            {...field}
-                            className="h-10 max-w-xl text-sm"
-                          />
+                          {name === "localeCode" ? (
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                              value={field.value}
+                            >
+                              <SelectTrigger className="h-10 max-w-xl bg-white text-sm">
+                                <SelectValue placeholder="Select a language">
+                                  {field.value &&
+                                  languages.find(
+                                    (l) => l.code === field.value,
+                                  ) ? (
+                                    <span className="flex items-center gap-2">
+                                      <span className="text-base">
+                                        {
+                                          languages.find(
+                                            (l) => l.code === field.value,
+                                          ).flag
+                                        }
+                                      </span>
+                                      <span>
+                                        {
+                                          languages.find(
+                                            (l) => l.code === field.value,
+                                          ).name
+                                        }
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    "Select a language"
+                                  )}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {languages.map((lang) => (
+                                  <SelectItem key={lang.code} value={lang.code}>
+                                    <span className="flex items-center gap-2">
+                                      <span className="text-base">
+                                        {lang.flag}
+                                      </span>
+                                      <span>{lang.name}</span>
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              placeholder={fieldLabel(name)}
+                              {...field}
+                              className="h-10 max-w-xl text-sm"
+                            />
+                          )}
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -341,15 +432,17 @@ const LocalizationTab = () => {
           ))}
 
           {/* Fixed Save Button */}
-          <div className="fixed right-0 bottom-0 left-[240px] z-10 flex justify-end border-t bg-white p-4">
-            <Button
-              type="submit"
-              disabled={loading}
-              className="bg-blue-600 font-medium text-white hover:bg-blue-700"
-            >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
-            </Button>
+          <div className="fixed right-0 bottom-0 z-10 w-[calc(100%-256px)] border-t bg-white p-4">
+            <div className="flex justify-end px-6">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="h-10 rounded-md bg-blue-600 px-8 font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+              >
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+              </Button>
+            </div>
           </div>
         </form>
       </Form>

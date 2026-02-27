@@ -1,5 +1,16 @@
-import React, { useState } from "react";
-import { Copy, Lock, Trash2, ChevronDown, Settings } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import {
+  Copy,
+  Lock,
+  Trash2,
+  ChevronDown,
+  Settings,
+  Loader2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useChatbot } from "@/context/ChatbotContext";
+import api from "@/lib/axios";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,11 +25,228 @@ import {
 } from "@/components/ui/select";
 
 const GeneralTab = () => {
-  const [chatbotId] = useState("9aae556e-8cbd-415e-8333-886fb1d148d2");
+  const router = useRouter();
+  const { selectedChatbot } = useChatbot();
+
+  const [chatbotId, setChatbotId] = useState("");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  const [disableSmartFollowup, setDisableSmartFollowup] = useState(false);
+  const [
+    numberOfSmartFollowupQuestionShown,
+    setNumberOfSmartFollowupQuestionShown,
+  ] = useState("3");
+  const [disableLeadNotifications, setDisableLeadNotifications] =
+    useState(false);
+  const [enablePageContextAwareness, setEnablePageContextAwareness] =
+    useState(true);
+  const [historyMessageContext, setHistoryMessageContext] = useState("1");
+  const [llmModel, setLlmModel] = useState("");
+  const [limitMessagesPerConversation, setLimitMessagesPerConversation] =
+    useState(false);
+  const [maxMessagesPerConversation, setMaxMessagesPerConversation] =
+    useState("20");
+  const [fallbackMessage, setFallbackMessage] = useState(
+    "I'm sorry, I don't have enough information to answer your question, but I'm happy to assist with any other questions you may have.",
+  );
+
+  const [availableModels, setAvailableModels] = useState([]);
+
+  const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (selectedChatbot) {
+      const currentChatbotId =
+        selectedChatbot.id || selectedChatbot.chatbotId || "";
+      setChatbotId(currentChatbotId);
+
+      const fetchDetails = async () => {
+        try {
+          const account = JSON.parse(localStorage.getItem("account") || "{}");
+          const accountId = account?.id;
+
+          if (accountId && currentChatbotId) {
+            const [basicRes, settingsRes, modelsRes] = await Promise.all([
+              api.get(
+                `/chatbots/account/${accountId}/chatbot/${currentChatbotId}`,
+              ),
+              api.get(
+                `/chatbots/account/${accountId}/chatbot/${currentChatbotId}/settings`,
+              ),
+              api.get(`/website/${currentChatbotId}/llm-models`),
+            ]);
+
+            if (basicRes?.data?.success) {
+              setName(basicRes.data.data.name || selectedChatbot.name || "");
+            }
+
+            let fetchedModels = [];
+            if (modelsRes?.data?.success) {
+              fetchedModels = modelsRes.data.data.websiteLlmModel || [];
+              setAvailableModels(fetchedModels);
+            }
+
+            if (settingsRes?.data?.success) {
+              const data = settingsRes.data.data;
+              if (data.name) setName(data.name);
+
+              const settings = data.settings;
+              if (settings) {
+                setDescription(settings.description || "");
+                setDisableSmartFollowup(settings.disableSmartFollowup ?? false);
+                setNumberOfSmartFollowupQuestionShown(
+                  settings.numberOfSmartFollowupQuestionShown?.toString() ??
+                    "3",
+                );
+                setEnablePageContextAwareness(
+                  settings.enablePageContextAwareness ?? true,
+                );
+                setHistoryMessageContext(
+                  settings.historyMessageContext?.toString() ?? "1",
+                );
+                setLimitMessagesPerConversation(
+                  settings.limitMessagesPerConversation ?? false,
+                );
+                setMaxMessagesPerConversation(
+                  settings.maxMessagesPerConversation?.toString() ?? "20",
+                );
+                if (settings.fallbackMessage) {
+                  setFallbackMessage(settings.fallbackMessage);
+                }
+
+                if (settings.llmModel) {
+                  const match = fetchedModels.find(
+                    (m) =>
+                      m.title === settings.llmModel ||
+                      m.id === settings.llmModel,
+                  );
+                  setLlmModel(match ? match.id : settings.llmModel);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch chatbot details:", error);
+          setName(selectedChatbot.name || "");
+          setDescription(selectedChatbot.description || "");
+        }
+      };
+
+      fetchDetails();
+    }
+  }, [selectedChatbot]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(chatbotId);
-    // You could add a toast notification here
+    toast.success("Chatbot ID copied to clipboard");
+  };
+
+  const handleSaveChanges = async () => {
+    setLoading(true);
+    try {
+      const account = JSON.parse(localStorage.getItem("account") || "{}");
+      const accountId = account?.id;
+
+      if (!accountId || !chatbotId) {
+        toast.error("Missing account or chatbot data");
+        return;
+      }
+
+      const basicPayload = {
+        name,
+        description,
+        status: "active",
+      };
+
+      const basicResponse = await api.patch(
+        `/chatbots/account/${accountId}/chatbot/${chatbotId}`,
+        basicPayload,
+      );
+
+      if (!basicResponse.data.success) {
+        toast.error(
+          basicResponse.data.message || "Failed to update basic details",
+        );
+        return;
+      }
+
+      let selectedModelId = llmModel;
+      const matched = availableModels.find((m) => m.title === llmModel);
+      if (matched) selectedModelId = matched.id;
+
+      const settingsPayload = {
+        description,
+        disableSmartFollowup,
+        numberOfSmartFollowupQuestionShown: Number(
+          numberOfSmartFollowupQuestionShown,
+        ),
+        enablePageContextAwareness,
+        historyMessageContext: Number(historyMessageContext),
+        limitMessagesPerConversation,
+        maxMessagesPerConversation: Number(maxMessagesPerConversation),
+        fallbackMessage,
+        ...(selectedModelId && { llmModel: selectedModelId }),
+      };
+
+      const settingsResponse = await api.patch(
+        `/chatbots/account/${accountId}/chatbot/${chatbotId}/settings`,
+        settingsPayload,
+      );
+
+      if (settingsResponse.data.success) {
+        toast.success(
+          settingsResponse.data.message || "Settings updated successfully",
+        );
+      } else {
+        toast.error(
+          settingsResponse.data.message || "Failed to update settings",
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || "Failed to save changes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteChatbot = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this chatbot? Once you delete your chatbot, you will no longer have access to message history.",
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const account = JSON.parse(localStorage.getItem("account") || "{}");
+      const accountId = account?.id;
+
+      if (!accountId || !chatbotId) {
+        toast.error("Missing account or chatbot data");
+        return;
+      }
+
+      const response = await api.delete(
+        `/chatbots/account/${accountId}/chatbot/${chatbotId}`,
+      );
+
+      if (response.data.success) {
+        toast.success(response.data.message || "Chatbot deleted successfully");
+        router.push("/dashboard");
+      } else {
+        toast.error(response.data.message || "Failed to delete chatbot");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || "Failed to delete chatbot");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -67,6 +295,22 @@ const GeneralTab = () => {
 
         {/* Form Fields */}
         <div className="space-y-6">
+          {/* Name */}
+          <div className="space-y-2">
+            <Label
+              htmlFor="name"
+              className="text-sm font-semibold text-gray-900"
+            >
+              Name
+            </Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+            />
+          </div>
+
           {/* Description */}
           <div className="space-y-2">
             <Label
@@ -78,6 +322,8 @@ const GeneralTab = () => {
             <div className="relative">
               <Textarea
                 id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder=""
                 className="min-h-[120px] resize-none border-gray-200 focus:border-blue-500 focus:ring-blue-500"
               />
@@ -103,6 +349,27 @@ const GeneralTab = () => {
             </p>
           </div>
 
+          {/* Fallback Message */}
+          <div className="space-y-2 py-2">
+            <Label
+              htmlFor="fallback-message"
+              className="text-sm font-semibold text-gray-900"
+            >
+              Fallback Message
+            </Label>
+            <Textarea
+              id="fallback-message"
+              value={fallbackMessage}
+              onChange={(e) => setFallbackMessage(e.target.value)}
+              placeholder=""
+              className="min-h-[100px] resize-none border-gray-200 text-[14px] focus:border-blue-500 focus:ring-blue-500"
+            />
+            <p className="text-muted-foreground text-[12px] leading-relaxed">
+              Customize the message shown when the chatbot cannot find relevant
+              information to answer a question.
+            </p>
+          </div>
+
           {/* Smart Follow up questions */}
           <div className="flex items-center justify-between py-2">
             <div className="space-y-1">
@@ -114,7 +381,11 @@ const GeneralTab = () => {
                 required information faster. Click this toggle to disable it.
               </p>
             </div>
-            <Switch className="data-[state=checked]:bg-blue-600" />
+            <Switch
+              checked={disableSmartFollowup}
+              onCheckedChange={setDisableSmartFollowup}
+              className="data-[state=checked]:bg-blue-600"
+            />
           </div>
 
           {/* Number of smart follow up questions */}
@@ -127,7 +398,11 @@ const GeneralTab = () => {
             </Label>
             <Input
               id="smart-follow-up-count"
-              defaultValue="3"
+              type="number"
+              value={numberOfSmartFollowupQuestionShown}
+              onChange={(e) =>
+                setNumberOfSmartFollowupQuestionShown(e.target.value)
+              }
               className="border-gray-200"
             />
             <p className="text-muted-foreground text-[12px] leading-relaxed">
@@ -146,7 +421,11 @@ const GeneralTab = () => {
                 new lead is captured with your chatbot.
               </p>
             </div>
-            <Switch className="data-[state=checked]:bg-blue-600" />
+            <Switch
+              checked={disableLeadNotifications}
+              onCheckedChange={setDisableLeadNotifications}
+              className="data-[state=checked]:bg-blue-600"
+            />
           </div>
 
           {/* Page Context Awareness */}
@@ -161,7 +440,8 @@ const GeneralTab = () => {
               </p>
             </div>
             <Switch
-              defaultChecked
+              checked={enablePageContextAwareness}
+              onCheckedChange={setEnablePageContextAwareness}
               className="data-[state=checked]:bg-blue-600"
             />
           </div>
@@ -176,7 +456,9 @@ const GeneralTab = () => {
             </Label>
             <Input
               id="history-messages"
-              defaultValue="1"
+              type="number"
+              value={historyMessageContext}
+              onChange={(e) => setHistoryMessageContext(e.target.value)}
               className="border-gray-200"
             />
             <p className="text-muted-foreground text-[12px] leading-relaxed">
@@ -192,14 +474,27 @@ const GeneralTab = () => {
             >
               GPT Model
             </Label>
-            <Select defaultValue="gpt-4o">
+            <Select
+              value={llmModel || undefined}
+              onValueChange={(val) => setLlmModel(val)}
+            >
               <SelectTrigger id="gpt-model" className="w-full border-gray-200">
                 <SelectValue placeholder="Select the GPT model" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                {availableModels.length > 0 ? (
+                  availableModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.title}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <>
+                    <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                    <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
+                    <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                  </>
+                )}
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-[12px] leading-relaxed">
@@ -222,12 +517,18 @@ const GeneralTab = () => {
               </p>
             </div>
             <div className="flex items-center justify-center rounded p-1 transition-colors hover:bg-gray-50">
-              <Lock className="text-muted-foreground/40 h-4 w-4" />
+              <Switch
+                checked={limitMessagesPerConversation}
+                onCheckedChange={setLimitMessagesPerConversation}
+                className="data-[state=checked]:bg-blue-600"
+              />
             </div>
           </div>
 
           {/* Max Messages Per Conversation */}
-          <div className="space-y-2 opacity-60">
+          <div
+            className={`space-y-2 ${!limitMessagesPerConversation ? "opacity-60" : ""}`}
+          >
             <div className="flex items-center gap-2">
               <Label
                 htmlFor="max-messages"
@@ -239,9 +540,11 @@ const GeneralTab = () => {
             </div>
             <Input
               id="max-messages"
-              defaultValue="20"
-              disabled
-              className="border-gray-200 bg-gray-50/50"
+              type="number"
+              value={maxMessagesPerConversation}
+              onChange={(e) => setMaxMessagesPerConversation(e.target.value)}
+              disabled={!limitMessagesPerConversation}
+              className={`border-gray-200 ${!limitMessagesPerConversation ? "bg-gray-50/50" : ""}`}
             />
             <p className="text-muted-foreground text-[12px] leading-relaxed">
               Number of messages before users are prompted to start a new
@@ -264,8 +567,11 @@ const GeneralTab = () => {
             </div>
             <Button
               variant="outline"
+              onClick={handleDeleteChatbot}
+              disabled={deleting}
               className="border-red-100 bg-red-50/30 px-6 text-red-500 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-600"
             >
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete Chatbot
             </Button>
           </div>
@@ -273,10 +579,17 @@ const GeneralTab = () => {
       </div>
 
       {/* Footer / Save Button */}
-      <div className="fixed right-10 bottom-6 z-50">
-        <Button className="h-11 transform bg-blue-600 px-8 font-medium text-white shadow-xl transition-all hover:scale-105 hover:bg-blue-700 active:scale-95">
-          Save Changes
-        </Button>
+      <div className="fixed right-0 bottom-0 z-10 w-[calc(100%-256px)] border-t bg-white p-4">
+        <div className="flex justify-end px-6">
+          <Button
+            onClick={handleSaveChanges}
+            disabled={loading}
+            className="h-10 rounded-md bg-blue-600 px-8 font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+          >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Changes
+          </Button>
+        </div>
       </div>
     </div>
   );

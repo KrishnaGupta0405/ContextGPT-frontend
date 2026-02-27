@@ -97,7 +97,7 @@ const data = {
     },
     { title: "Text Snippets", url: "/text-snippets", icon: Type },
     { title: "Website Links", url: "/website-links", icon: Link2 },
-    { title: "Files & Data Sources", url: "/files-sources", icon: FileText },
+    { title: "Files & Data Sources", url: "/website-files", icon: FileText },
     { title: "Auto Sync Jobs", url: "/auto-sync", icon: History, badge: "New" },
   ],
   customizations: [
