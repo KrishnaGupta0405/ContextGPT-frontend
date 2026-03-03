@@ -1,11 +1,105 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
+import { useChatbot } from "@/context/ChatbotContext";
+import api from "@/lib/axios";
+import { toast } from "sonner";
 
 export function AddYoutubeContent({ onBack, onAdd }) {
+  const { selectedChatbot } = useChatbot();
+  const [youtubeUrlsText, setYoutubeUrlsText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Helper to extract a YouTube Video ID from various URL formats
+  const extractVideoId = (url) => {
+    try {
+      if (!url) return null;
+      const urlObj = new URL(url);
+
+      if (urlObj.hostname.includes("youtube.com")) {
+        // Handle youtube.com/watch?v=XXXX
+        if (urlObj.searchParams.has("v")) {
+          return urlObj.searchParams.get("v");
+        }
+        // Handle edge youtube.com/embed/XXXX
+        if (urlObj.pathname.startsWith("/embed/")) {
+          return urlObj.pathname.split("/")[2];
+        }
+        // Handle youtube.com/shorts/XXXX
+        if (urlObj.pathname.startsWith("/shorts/")) {
+          return urlObj.pathname.split("/")[2];
+        }
+      }
+
+      // Handle youtu.be/XXXX
+      if (urlObj.hostname === "youtu.be") {
+        return urlObj.pathname.slice(1);
+      }
+    } catch (e) {
+      // In case it's not a valid full URL but just the ID
+      if (url.length === 11 && !url.includes("/") && !url.includes("?")) {
+        return url;
+      }
+    }
+    return null;
+  };
+
+  const handleSubmit = async () => {
+    if (!youtubeUrlsText.trim()) {
+      toast.error("Please enter at least one YouTube URL");
+      return;
+    }
+
+    const lines = youtubeUrlsText
+      .split("\n")
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0);
+
+    const videoIds = lines
+      .map(extractVideoId)
+      .filter((id) => id && id.length > 0);
+
+    if (videoIds.length === 0) {
+      toast.error("No valid YouTube Video URLs found");
+      return;
+    }
+
+    const chatbotId = selectedChatbot?.id || selectedChatbot?.chatbotId;
+    if (!chatbotId) {
+      toast.error("No chatbot selected");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const response = await api.post("/ingestion/youtube-transcripts", {
+        chatbotId,
+        videoIds,
+      });
+
+      if (response.data?.success) {
+        toast.success(
+          response.data.message || "YouTube transcripts processing started.",
+        );
+        if (onAdd) onAdd();
+      } else {
+        toast.error(
+          response.data?.message || "Failed to process YouTube transcripts",
+        );
+      }
+    } catch (error) {
+      console.error("Error submitting YouTube URLs:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to submit YouTube URLs",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="relative flex h-full flex-col">
       <div className="mb-4 flex items-center gap-2">
@@ -31,6 +125,8 @@ export function AddYoutubeContent({ onBack, onAdd }) {
             <Textarea
               className="min-h-[160px]"
               placeholder="https://www.youtube.com/watch?v=..."
+              value={youtubeUrlsText}
+              onChange={(e) => setYoutubeUrlsText(e.target.value)}
             />
             <div className="mt-2 space-y-1 text-sm text-slate-500">
               <p>
@@ -57,10 +153,18 @@ export function AddYoutubeContent({ onBack, onAdd }) {
 
         <div className="mt-8 flex justify-end">
           <Button
-            onClick={onAdd}
+            onClick={handleSubmit}
+            disabled={isSubmitting}
             className="bg-blue-600 font-medium text-white hover:bg-blue-700"
           >
-            Add YouTube Content
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              "Add YouTube Content"
+            )}
           </Button>
         </div>
       </div>

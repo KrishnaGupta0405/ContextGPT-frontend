@@ -42,6 +42,7 @@ import { useChatbot } from "@/context/ChatbotContext";
 import api from "@/lib/axios";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
+import LoadingBar from "react-top-loading-bar";
 import { AddLinksModal } from "./AddLinksModal";
 
 const TABS = [
@@ -79,8 +80,11 @@ const WebsiteLinks = () => {
   const { selectedChatbot } = useChatbot();
   const [activeTab, setActiveTab] = useState("total");
   const [files, setFiles] = useState([]);
+  const [selectedLinks, setSelectedLinks] = useState([]);
+  const [editingLink, setEditingLink] = useState(null);
   const [totalFiles, setTotalFiles] = useState(0);
   const [loading, setLoading] = useState(false);
+  const loadingBarRef = React.useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [stats, setStats] = useState({
     total: 0, // Using initial mock values
@@ -104,6 +108,34 @@ const WebsiteLinks = () => {
 
   const activeTabTitle = TABS.find((t) => t.id === activeTab)?.title || "Total";
 
+  const formatTableDate = (dateStr) => {
+    if (!dateStr) return "-";
+    try {
+      // Handle UTC strings like "2026-02-27 12:42:52.705" from backend explicitly as UTC
+      const normalized = dateStr.endsWith("Z")
+        ? dateStr
+        : dateStr.replace(" ", "T") + "Z";
+      const date = new Date(normalized);
+      // Format to ex: Feb 27, 2026 12:42 PM
+      return format(date, "MMM dd, yyyy h:mm a");
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const formatSource = (source) => {
+    switch (source) {
+      case "FIRECRAWL_BULK":
+        return "MultipleLink";
+      case "FIRECRAWL_SITEMAP":
+        return "Sitemap";
+      case "FIRECRAWL_CRAWL":
+        return "Website";
+      default:
+        return source ? source.replace("FIRECRAWL_", "") : "-";
+    }
+  };
+
   const handleDownloadCSV = () => {
     if (!files || files.length === 0) {
       toast.error("No data to download");
@@ -123,11 +155,21 @@ const WebsiteLinks = () => {
 
     const rows = files.map((file) => {
       const url = file.metadata?.sourceUrl || file.fileName || "";
-      const linkType = file.fileSource || "";
+      const linkType = formatSource(file.fileSource);
 
       let statusStr = "Unknown";
       if (file.status === "COMPLETED") statusStr = "Trained";
-      else if (file.status === "PENDING") statusStr = "Pending";
+      else if (
+        [
+          "PENDING",
+          "CHUNKING",
+          "EMBEDDING",
+          "RESYNCING",
+          "DELETING",
+          "UPLOADED",
+        ].includes(file.status)
+      )
+        statusStr = "Pending";
       else if (file.status === "FAILED") statusStr = "Failed";
 
       const title = url;
@@ -173,6 +215,98 @@ const WebsiteLinks = () => {
     document.body.removeChild(link);
   };
 
+  const handleDeleteLink = async (fileIds) => {
+    if (!selectedChatbot?.id && !selectedChatbot?.chatbotId) {
+      toast.error("No chatbot selected");
+      return;
+    }
+    const chatbotId = selectedChatbot?.id || selectedChatbot?.chatbotId;
+
+    if (!confirm("Are you sure you want to delete these link(s)?")) return;
+
+    // Support either a single ID string or an array of IDs
+    const idsToDelete = Array.isArray(fileIds) ? fileIds : [fileIds];
+
+    if (idsToDelete.length === 0) return;
+
+    // Build the query string using URLSearchParams explicitly
+    const params = new URLSearchParams();
+    idsToDelete.forEach((id) => params.append("fileId", id));
+
+    try {
+      loadingBarRef.current?.continuousStart();
+      const response = await api.delete(
+        `/ingestion/${chatbotId}/files?${params.toString()}`,
+      );
+      if (response.data?.success) {
+        const { deletedCount, failedCount } = response.data.data;
+        if (failedCount > 0) {
+          toast.warning(
+            `Deleted ${deletedCount} links. Failed: ${failedCount}`,
+          );
+        } else {
+          toast.success(`Successfully deleted ${deletedCount} links`);
+        }
+
+        setSelectedLinks([]); // Clear selections on success
+
+        const activeTabConfig = TABS.find((t) => t.id === activeTab);
+        fetchFiles(currentPage, activeTabConfig?.status);
+      } else {
+        toast.error(response.data?.message || "Failed to delete link(s)");
+      }
+    } catch (error) {
+      console.error("Error deleting link(s):", error);
+      toast.error(error.response?.data?.message || "Failed to delete link(s)");
+    } finally {
+      loadingBarRef.current?.complete();
+    }
+  };
+
+  const handleResyncLink = async (fileIds) => {
+    if (!selectedChatbot?.id && !selectedChatbot?.chatbotId) {
+      toast.error("No chatbot selected");
+      return;
+    }
+    const chatbotId = selectedChatbot?.id || selectedChatbot?.chatbotId;
+
+    if (!confirm("Are you sure you want to resync these link(s)?")) return;
+
+    // Support either a single ID string or an array of IDs
+    const idsToResync = Array.isArray(fileIds) ? fileIds : [fileIds];
+
+    if (idsToResync.length === 0) return;
+
+    // Build the query string explicitly with URLSearchParams
+    const params = new URLSearchParams();
+    idsToResync.forEach((id) => params.append("fileId", id));
+
+    try {
+      loadingBarRef.current?.continuousStart();
+      const response = await api.post(
+        `/ingestion/${chatbotId}/links/resync?${params.toString()}`,
+      );
+      if (response.data?.success) {
+        toast.success(
+          response.data.message ||
+            `Started resync for ${idsToResync.length} file(s)`,
+        );
+
+        setSelectedLinks([]); // Clear selections on success
+
+        const activeTabConfig = TABS.find((t) => t.id === activeTab);
+        fetchFiles(currentPage, activeTabConfig?.status);
+      } else {
+        toast.error(response.data?.message || "Failed to resync link(s)");
+      }
+    } catch (error) {
+      console.error("Error resyncing link(s):", error);
+      toast.error(error.response?.data?.message || "Failed to resync link(s)");
+    } finally {
+      loadingBarRef.current?.complete();
+    }
+  };
+
   const handleRefreshLinks = async () => {
     if (cooldown > 0) {
       toast.error("Please wait a moment before refreshing again");
@@ -192,6 +326,7 @@ const WebsiteLinks = () => {
   const fetchFiles = async (page = 1, status) => {
     try {
       setLoading(true);
+      loadingBarRef.current?.continuousStart();
       const chatbotId = selectedChatbot?.id || selectedChatbot?.chatbotId;
       const account = JSON.parse(localStorage.getItem("account") || "{}");
       const accountId = account?.id;
@@ -201,7 +336,7 @@ const WebsiteLinks = () => {
         return;
       }
 
-      const params = { page };
+      const params = {};
       if (status) params.status = status;
 
       const response = await api.get(
@@ -210,14 +345,47 @@ const WebsiteLinks = () => {
       );
 
       if (response.data?.success) {
-        setFiles(response.data.data.links);
+        const fetchedLinks = response.data.data.links || [];
+        setFiles(fetchedLinks);
         setTotalFiles(response.data.data.total);
 
-        // Update the mock stat total for current tab
-        setStats((prev) => {
-          const tab = TABS.find((t) => t.status === status) || TABS[0];
-          return { ...prev, [tab.id]: response.data.data.total };
-        });
+        // If we fetched the "total" tab, we can derive the counts for all categories
+        // from the payload to keep the stats up to date dynamically:
+        if (!status) {
+          const statsUpdate = {
+            total: response.data.data.total || 0,
+            trained: 0,
+            pending: 0,
+            failed: 0,
+          };
+
+          fetchedLinks.forEach((link) => {
+            const st = link.status;
+            if (st === "COMPLETED") {
+              statsUpdate.trained += 1;
+            } else if (st === "FAILED") {
+              statsUpdate.failed += 1;
+            } else if (
+              st === "PENDING" ||
+              st === "CHUNKING" ||
+              st === "EMBEDDING" ||
+              st === "RESYNCING" ||
+              st === "DELETING" ||
+              st === "UPLOADED"
+            ) {
+              statsUpdate.pending += 1;
+            }
+          });
+
+          setStats(statsUpdate);
+        } else {
+          // If we are currently filtered by a specific tab, just update that tab's count
+          // using the `total` returned from the API pagination metadata
+          setStats((prev) => {
+            const tab = TABS.find((t) => t.status === status) || TABS[0];
+            return { ...prev, [tab.id]: response.data.data.total };
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching files:", error);
@@ -226,6 +394,7 @@ const WebsiteLinks = () => {
       setTotalFiles(0);
     } finally {
       setLoading(false);
+      loadingBarRef.current?.complete();
     }
   };
 
@@ -261,6 +430,7 @@ const WebsiteLinks = () => {
 
   return (
     <TooltipProvider>
+      <LoadingBar color="#3b82f6" ref={loadingBarRef} shadow={true} />
       <div className="flex h-full flex-col">
         <PanelNavbar
           items={[
@@ -327,7 +497,7 @@ const WebsiteLinks = () => {
                 />
               </div>
               <Button
-                className="border-0 bg-[#8392ab] text-white hover:bg-[#6e7d96]"
+                className="border-0 bg-blue-600 text-white hover:bg-blue-700"
                 onClick={() => setIsAddModalOpen(true)}
               >
                 <Plus className="mr-2 h-4 w-4" /> Add Links
@@ -382,7 +552,28 @@ const WebsiteLinks = () => {
 
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button className="flex flex-1 items-center justify-center border-r border-slate-100 py-2.5 text-blue-500 transition-colors hover:bg-[#eaf1fb]">
+                        <button
+                          className="flex flex-1 items-center justify-center border-r border-slate-100 py-2.5 text-blue-500 transition-colors hover:bg-[#eaf1fb]"
+                          onClick={() => {
+                            if (selectedLinks.length > 0) {
+                              handleResyncLink(selectedLinks);
+                              return;
+                            }
+                            const ids = tab.status
+                              ? files
+                                  .filter((f) => f.status === tab.status)
+                                  .map((f) => f.id)
+                              : files.map((f) => f.id);
+
+                            if (ids.length > 0) {
+                              handleResyncLink(ids);
+                            } else {
+                              toast.info(
+                                "No links found to resync in this view.",
+                              );
+                            }
+                          }}
+                        >
                           <RefreshCw className="h-4 w-4" />
                         </button>
                       </TooltipTrigger>
@@ -393,12 +584,36 @@ const WebsiteLinks = () => {
 
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button className="flex flex-1 items-center justify-center py-2.5 text-red-500 transition-colors hover:bg-[#ffeef0]">
+                        <button
+                          className="flex flex-1 items-center justify-center py-2.5 text-red-500 transition-colors hover:bg-[#ffeef0]"
+                          onClick={() => {
+                            // First, use selected checkboxes if any
+                            if (selectedLinks.length > 0) {
+                              handleDeleteLink(selectedLinks);
+                              return;
+                            }
+
+                            // Otherwise, fallback to deleting all visible links for this tab
+                            const ids = tab.status
+                              ? files
+                                  .filter((f) => f.status === tab.status)
+                                  .map((f) => f.id)
+                              : files.map((f) => f.id);
+
+                            if (ids.length > 0) {
+                              handleDeleteLink(ids);
+                            } else {
+                              toast.info(
+                                "No links found to delete in this view.",
+                              );
+                            }
+                          }}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </TooltipTrigger>
                       <TooltipContent side="top">
-                        Delete all links
+                        Delete all visible links
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -474,7 +689,20 @@ const WebsiteLinks = () => {
                 <TableHeader>
                   <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
                     <TableHead className="w-[40px] text-center">
-                      <Checkbox />
+                      <Checkbox
+                        disabled={loading || files.length === 0}
+                        checked={
+                          files.length > 0 &&
+                          selectedLinks.length === files.length
+                        }
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedLinks(files.map((f) => f.id));
+                          } else {
+                            setSelectedLinks([]);
+                          }
+                        }}
+                      />
                     </TableHead>
                     <TableHead className="text-xs font-semibold text-slate-500">
                       URL
@@ -534,7 +762,18 @@ const WebsiteLinks = () => {
                     files.map((file) => (
                       <TableRow key={file.id} className="hover:bg-slate-50/80">
                         <TableCell className="text-center">
-                          <Checkbox />
+                          <Checkbox
+                            checked={selectedLinks.includes(file.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedLinks((prev) => [...prev, file.id]);
+                              } else {
+                                setSelectedLinks((prev) =>
+                                  prev.filter((id) => id !== file.id),
+                                );
+                              }
+                            }}
+                          />
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
@@ -564,7 +803,7 @@ const WebsiteLinks = () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-[13px] font-medium text-slate-600">
-                          {file.fileSource}
+                          {formatSource(file.fileSource)}
                         </TableCell>
                         <TableCell>
                           {(() => {
@@ -595,7 +834,8 @@ const WebsiteLinks = () => {
                             if (
                               st === "CHUNKING" ||
                               st === "EMBEDDING" ||
-                              st === "PENDING"
+                              st === "PENDING" ||
+                              st === "UPLOADED"
                             ) {
                               return (
                                 <Tooltip>
@@ -689,10 +929,10 @@ const WebsiteLinks = () => {
                           })()}
                         </TableCell>
                         <TableCell className="text-[13px] text-slate-600">
-                          {getTimeAgo(file.createdAt)}
+                          {formatTableDate(file.createdAt)}
                         </TableCell>
                         <TableCell className="text-[13px] text-slate-600">
-                          {getTimeAgo(file.updatedAt)}
+                          {formatTableDate(file.updatedAt)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-end space-x-2 text-slate-400">
@@ -703,12 +943,7 @@ const WebsiteLinks = () => {
                                   size="icon"
                                   className="h-8 w-8 hover:text-slate-600"
                                   onClick={() =>
-                                    window.open(
-                                      file.metadata?.sourceUrl ||
-                                        file.fileName ||
-                                        "#",
-                                      "_blank",
-                                    )
+                                    window.open(file.storageUri, "_blank")
                                   }
                                 >
                                   <Eye className="h-4 w-4" />
@@ -722,12 +957,17 @@ const WebsiteLinks = () => {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 hover:text-slate-600"
-                                  onClick={() => setIsAddModalOpen(true)}
+                                  onClick={() => {
+                                    setEditingLink(file);
+                                    setIsAddModalOpen(true);
+                                  }}
                                 >
                                   <Wrench className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Settings</TooltipContent>
+                              <TooltipContent>
+                                Update configuration
+                              </TooltipContent>
                             </Tooltip>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -735,6 +975,7 @@ const WebsiteLinks = () => {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 hover:text-blue-600"
+                                  onClick={() => handleResyncLink(file.id)}
                                 >
                                   <RefreshCw className="h-4 w-4" />
                                 </Button>
@@ -747,6 +988,7 @@ const WebsiteLinks = () => {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-red-400 hover:bg-red-50 hover:text-red-500"
+                                  onClick={() => handleDeleteLink(file.id)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -764,7 +1006,16 @@ const WebsiteLinks = () => {
           </div>
         </div>
       </div>
-      <AddLinksModal isOpen={isAddModalOpen} onClose={setIsAddModalOpen} />
+      <AddLinksModal
+        isOpen={isAddModalOpen}
+        onClose={(open) => {
+          setIsAddModalOpen(open);
+          if (!open) {
+            setTimeout(() => setEditingLink(null), 300);
+          }
+        }}
+        initialData={editingLink}
+      />
     </TooltipProvider>
   );
 };

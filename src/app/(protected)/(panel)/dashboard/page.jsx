@@ -31,7 +31,7 @@ export default function Dashboard() {
         {/* DASHBOARD HEADER */}
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-            Dashboard
+            This page is dummy. Dashboard
           </h2>
         </div>
 

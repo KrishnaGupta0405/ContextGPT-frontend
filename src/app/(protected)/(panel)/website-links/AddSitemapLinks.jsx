@@ -1,12 +1,90 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
+import { useChatbot } from "@/context/ChatbotContext";
+import api from "@/lib/axios";
+import { toast } from "sonner";
 
 export function AddSitemapLinks({ onBack, onAdd }) {
+  const { selectedChatbot } = useChatbot();
+  const [sitemapUrl, setSitemapUrl] = useState("");
+  const [maxPages, setMaxPages] = useState(100);
+  const [includeUrlPaths, setIncludeUrlPaths] = useState("");
+  const [excludeUrlPaths, setExcludeUrlPaths] = useState("");
+  const [includeSelectorsText, setIncludeSelectorsText] = useState("");
+  const [excludeSelectorsText, setExcludeSelectorsText] = useState("");
+  const [customHeadersText, setCustomHeadersText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!sitemapUrl.trim()) {
+      toast.error("Please enter a sitemap URL");
+      return;
+    }
+
+    const maxP = parseInt(maxPages, 10);
+    if (isNaN(maxP) || maxP <= 0) {
+      toast.error("Please enter a valid number for max pages");
+      return;
+    }
+
+    const getLines = (text) =>
+      text
+        .split("\n")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
+    const includePaths = getLines(includeUrlPaths);
+    const excludePaths = getLines(excludeUrlPaths);
+    const includeSelectors = getLines(includeSelectorsText);
+    const excludeSelectors = getLines(excludeSelectorsText);
+
+    const chatbotId = selectedChatbot?.id || selectedChatbot?.chatbotId;
+    if (!chatbotId) {
+      toast.error("No chatbot selected");
+      return;
+    }
+
+    const payload = {
+      chatbotId,
+      sitemapUrl: sitemapUrl.trim(),
+      maxPages: maxP,
+      extractMainContentOnly: false,
+    };
+
+    if (includePaths.length > 0) payload.includeUrlPaths = includePaths;
+    if (excludePaths.length > 0) payload.excludeUrlPaths = excludePaths;
+    if (includeSelectors.length > 0)
+      payload.includeSelectors = includeSelectors;
+    if (excludeSelectors.length > 0)
+      payload.excludeSelectors = excludeSelectors;
+    if (customHeadersText.trim())
+      payload.customHeaders = customHeadersText.trim();
+
+    try {
+      setIsSubmitting(true);
+      const response = await api.post("/ingestion/web-scrape/sitemap", payload);
+
+      if (response.data?.success) {
+        toast.success(response.data.message || "Batch scrape job started.");
+        if (onAdd) onAdd();
+      } else {
+        toast.error(response.data?.message || "Failed to start scrape job");
+      }
+    } catch (error) {
+      console.error("Error submitting sitemap links:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to submit sitemap links",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="relative flex h-full flex-col">
       <div className="mb-4 flex items-center gap-2">
@@ -28,14 +106,22 @@ export function AddSitemapLinks({ onBack, onAdd }) {
             <Label className="font-semibold text-slate-700">
               Sitemap URL <span className="text-red-500">*</span>
             </Label>
-            <Input placeholder="https://example.com/sitemap.xml" />
+            <Input
+              placeholder="https://example.com/sitemap.xml"
+              value={sitemapUrl}
+              onChange={(e) => setSitemapUrl(e.target.value)}
+            />
           </div>
 
           <div className="space-y-3">
             <Label className="font-semibold text-slate-700">
               Max Pages to Scrape <span className="text-red-500">*</span>
             </Label>
-            <Input type="number" defaultValue={100} />
+            <Input
+              type="number"
+              value={maxPages}
+              onChange={(e) => setMaxPages(e.target.value)}
+            />
             <p className="text-sm text-slate-500">
               The maximum number of pages to scrape from the sitemap. You have
               998 pages remaining in your quota.
@@ -49,6 +135,8 @@ export function AddSitemapLinks({ onBack, onAdd }) {
             <Textarea
               className="min-h-[80px]"
               placeholder="/blog&#10;/docs"
+              value={includeUrlPaths}
+              onChange={(e) => setIncludeUrlPaths(e.target.value)}
             />
             <p className="text-sm text-slate-500">
               Only pages matching these path patterns will be scraped. For
@@ -64,6 +152,8 @@ export function AddSitemapLinks({ onBack, onAdd }) {
             <Textarea
               className="min-h-[80px]"
               placeholder="/blog/drafts&#10;/docs/internal"
+              value={excludeUrlPaths}
+              onChange={(e) => setExcludeUrlPaths(e.target.value)}
             />
             <p className="text-sm text-slate-500">
               Pages matching these path patterns will be excluded. For example,
@@ -79,6 +169,8 @@ export function AddSitemapLinks({ onBack, onAdd }) {
             <Textarea
               className="min-h-[80px]"
               placeholder="main&#10;.content&#10;#article"
+              value={includeSelectorsText}
+              onChange={(e) => setIncludeSelectorsText(e.target.value)}
             />
             <div className="space-y-1 text-sm text-slate-500">
               <p>Include content only from matching these CSS selectors.</p>
@@ -104,6 +196,8 @@ export function AddSitemapLinks({ onBack, onAdd }) {
             <Textarea
               className="min-h-[80px]"
               placeholder="footer&#10;.sidebar&#10;#comments"
+              value={excludeSelectorsText}
+              onChange={(e) => setExcludeSelectorsText(e.target.value)}
             />
             <div className="space-y-1 text-sm text-slate-500">
               <p>Exclude content matching these CSS selectors.</p>
@@ -129,6 +223,8 @@ export function AddSitemapLinks({ onBack, onAdd }) {
             <Textarea
               className="min-h-[80px]"
               placeholder="Authorization: Bearer your-token-here&#10;User-Agent: YourBot/1.0&#10;Cookie: session=abc123"
+              value={customHeadersText}
+              onChange={(e) => setCustomHeadersText(e.target.value)}
             />
             <div className="space-y-1 text-sm text-slate-500">
               <p>Add custom HTTP headers for accessing protected content.</p>
@@ -145,10 +241,18 @@ export function AddSitemapLinks({ onBack, onAdd }) {
         </div>
         <div className="mt-8 flex justify-end">
           <Button
-            onClick={onAdd}
+            onClick={handleSubmit}
+            disabled={isSubmitting}
             className="bg-blue-600 font-medium text-white hover:bg-blue-700"
           >
-            Add Links
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              "Add Links"
+            )}
           </Button>
         </div>
       </div>

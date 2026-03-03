@@ -21,6 +21,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Chrome, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { CustomBreadcrumb } from "@/components/ui/CustomBreadcrumb";
 import api from "@/lib/axios";
+import axios from "axios";
 import { toast } from "sonner";
 import LoadingIndicator from "@/components/ui/LoadingIndicator";
 import { useRouter } from "next/navigation";

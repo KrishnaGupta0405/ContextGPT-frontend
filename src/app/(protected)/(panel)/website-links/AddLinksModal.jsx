@@ -13,8 +13,14 @@ import { AddSitemapLinks } from "./AddSitemapLinks";
 import { AddYoutubeContent } from "./AddYoutubeContent";
 import { AddWebsiteLinks } from "./AddWebsiteLinks";
 
-export function AddLinksModal({ isOpen, onClose }) {
+export function AddLinksModal({ isOpen, onClose, initialData }) {
   const [activeView, setActiveView] = useState("menu");
+
+  React.useEffect(() => {
+    if (isOpen && initialData) {
+      setActiveView("scrape");
+    }
+  }, [isOpen, initialData]);
 
   const handleOpenChange = (open) => {
     if (!open) {
@@ -140,8 +146,9 @@ export function AddLinksModal({ isOpen, onClose }) {
         ) : activeView === "scrape" ? (
           <div className="flex-1 overflow-y-auto p-6 sm:p-8">
             <AddWebsiteLinks
-              onBack={() => setActiveView("menu")}
+              onBack={initialData ? undefined : () => setActiveView("menu")}
               onAdd={handleAddSubmit}
+              initialData={initialData}
             />
           </div>
         ) : activeView === "youtube" ? (
