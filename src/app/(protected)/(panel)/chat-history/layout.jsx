@@ -8,7 +8,8 @@ export const metadata = {
 
 export default function ChatHistoryLayout({ children, middle, right }) {
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden">
+    // 1. Changed h-full to h-[100dvh] to strictly lock to the viewport height
+    <div className="flex h-[100dvh] w-full flex-col overflow-hidden">
       <PanelNavbar
         items={[
           { label: "Dashboard", href: "/dashboard" },
@@ -16,10 +17,13 @@ export default function ChatHistoryLayout({ children, middle, right }) {
         ]}
       />
       <div className="flex flex-1 overflow-hidden">
-        <div className="bg-background w-1/3 min-w-[300px] border-r">
+        {/* 2. Added flex & flex-col so height passes smoothly to the children */}
+        <div className="bg-background flex w-1/3 min-w-[300px] flex-col overflow-hidden border-r">
           {middle}
         </div>
-        <div className="bg-background flex-1">{right}</div>
+        <div className="bg-background flex flex-1 flex-col overflow-hidden">
+          {right}
+        </div>
       </div>
     </div>
   );

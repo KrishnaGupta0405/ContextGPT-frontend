@@ -591,7 +591,7 @@ const ChatHistoryMiddle = () => {
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col p-2">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => (

@@ -637,7 +637,7 @@ const ChatHistoryRight = () => {
       </div>
 
       {/* Messages Area */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="min-h-0 flex-1 p-4">
         <div className="flex h-full flex-col gap-4">
           {loading && messages.length === 0
             ? Array.from({ length: 4 }).map((_, i) => (
