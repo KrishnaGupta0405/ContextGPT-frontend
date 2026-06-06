@@ -2,27 +2,100 @@ import axios from "axios";
 
 // Create an axios instance
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_BACKEND_API_URL, // Adjust based on your environment
+  baseURL: process.env.NEXT_PUBLIC_BACKEND_API_URL,
   withCredentials: true,
 });
 
-// Add a request interceptor (optional, e.g., for auth tokens)
+// ── Logout callback (set by AuthContext so interceptor can trigger logout) ──
+let _logoutCallback = null;
+
+export function registerLogoutCallback(fn) {
+  _logoutCallback = fn;
+}
+
+function triggerLogout() {
+  if (_logoutCallback) _logoutCallback();
+}
+
+// ── Refresh-token queue ─────────────────────────────────────────────────────
+// Prevents multiple concurrent refresh requests when several API calls fail
+// at the same time with 401.
+let isRefreshing = false;
+let failedQueue = []; // { resolve, reject } promises waiting for the refresh
+
+function processQueue(error, token = null) {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) reject(error);
+    else resolve(token);
+  });
+  failedQueue = [];
+}
+
+// ── Request interceptor ─────────────────────────────────────────────────────
 api.interceptors.request.use(
   (config) => {
-    console.log("Axios Request Debug:", {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      baseURL: config.baseURL,
-      fullUrl: `${config.baseURL || ""}${config.url}`,
-      headers: config.headers,
-      data: config.data,
-      params: config.params,
-      withCredentials: config.withCredentials,
-    });
+    console.log(
+      `%c[Axios Request] ${config.method?.toUpperCase()} ${config.baseURL ?? ""}${config.url}`,
+      "color: #4fc3f7; font-weight: bold;",
+      {
+        params: config.params,
+        data: config.data,
+        headers: config.headers,
+      },
+    );
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
+  (error) => Promise.reject(error),
+);
+
+// ── Response interceptor ────────────────────────────────────────────────────
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Only handle 401 errors, skip if this is already a retry or an auth request
+    if (
+      error.response?.status !== 401 ||
+      originalRequest._retry ||
+      originalRequest.url === "/auth/refresh-token" ||
+      originalRequest.url === "/auth/login" ||
+      originalRequest.url === "/auth/logout" ||
+      originalRequest.url === "/users/current-user"
+    ) {
+      return Promise.reject(error);
+    }
+
+    // If a refresh is already in progress, queue this request
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      })
+        .then(() => {
+          // Retry the original request (cookies are updated automatically)
+          return api(originalRequest);
+        })
+        .catch((err) => Promise.reject(err));
+    }
+
+    // Attempt to refresh the token
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      await api.post("/auth/refresh-token");
+      // Refresh succeeded — cookies are now updated by the browser
+      processQueue(null);
+      // Retry the original request
+      return api(originalRequest);
+    } catch (refreshError) {
+      // Refresh token is also invalid/expired → force logout
+      processQueue(refreshError);
+      triggerLogout();
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   },
 );
 

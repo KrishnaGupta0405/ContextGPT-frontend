@@ -8,9 +8,11 @@ import CurrentLeadsTab from "./CurrentLeadsTab";
 import { useChatbot } from "@/context/ChatbotContext";
 import { PanelNavbar } from "@/components/navbar/PanelNavbar";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 
 const LeadsContent = () => {
   const { selectedChatbot } = useChatbot();
+  const { guardNavigation } = useUnsavedChanges();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -28,10 +30,12 @@ const LeadsContent = () => {
   }, [tabParam]);
  
   const handleTabChange = (value) => {
-    setActiveTab(value);
-    const params = new URLSearchParams(searchParams);
-    params.set("tab", value);
-    router.replace(`${pathname}?${params.toString()}`);
+    guardNavigation(() => {
+      setActiveTab(value);
+      const params = new URLSearchParams(searchParams);
+      params.set("tab", value);
+      router.replace(`${pathname}?${params.toString()}`);
+    });
   };
 
   return (

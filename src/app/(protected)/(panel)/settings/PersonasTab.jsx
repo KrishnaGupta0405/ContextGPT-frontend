@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import api from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import {
@@ -238,6 +239,7 @@ const PersonaCard = ({
 
 const PersonasTab = () => {
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
   const [personas, setPersonas] = useState([]);
   const [selectedPersonaId, setSelectedPersonaId] = useState(null);
 
@@ -259,6 +261,10 @@ const PersonasTab = () => {
       fetchPersonas();
     }
   }, [selectedChatbot]);
+
+  useEffect(() => {
+    return () => markClean();
+  }, [markClean]);
 
   const getCombinedPersonas = (fetched) => {
     const combined = [...fetched];
@@ -429,6 +435,7 @@ const PersonasTab = () => {
 
       if (response.data.success) {
         toast.success(response.data.message || "Persona selection saved!");
+        markClean();
       }
     } catch (error) {
       toast.error(
@@ -466,7 +473,7 @@ const PersonasTab = () => {
               key={persona.id || persona.title}
               persona={persona}
               isSelected={selectedPersonaId === persona.id}
-              onSelect={(p) => setSelectedPersonaId(p.id)}
+              onSelect={(p) => { setSelectedPersonaId(p.id); markDirty(); }}
               isExpanded={expandedCardId === persona.id}
               onToggleExpand={() =>
                 setExpandedCardId(
@@ -633,7 +640,7 @@ const PersonasTab = () => {
                 key={persona.id}
                 persona={persona}
                 isSelected={selectedPersonaId === persona.id}
-                onSelect={(p) => setSelectedPersonaId(p.id)}
+                onSelect={(p) => { setSelectedPersonaId(p.id); markDirty(); }}
                 isExpanded={expandedCardId === persona.id}
                 onToggleExpand={() =>
                   setExpandedCardId(

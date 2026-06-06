@@ -26,6 +26,10 @@ import {
   ChevronRight,
   Plus,
   RefreshCw,
+  ChartLine,
+  Key,
+  UserStar,
+  Zap,
 } from "lucide-react";
 
 import {
@@ -63,6 +67,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useChatbot } from "@/context/ChatbotContext";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 
 import {
   BadgeCheck,
@@ -70,6 +75,7 @@ import {
   ChevronsUpDown,
   CreditCard,
   LogOut,
+  Megaphone,
   // Sparkles,
 } from "lucide-react";
 
@@ -157,9 +163,15 @@ export function NavUser({ user }) {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/notifications">
-                  <Bell className="mr-2 size-4" />
-                  Notifications
+                <Link href="/usage">
+                  <ChartLine className="mr-2 size-4" />
+                  Usage
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/usage/api-keys">
+                  <Key className="mr-2 size-4" />
+                  API Keys
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
@@ -243,16 +255,37 @@ const data = {
     { title: "Human Support", url: "/leads?tab=human-settings", icon: Headset },
   ],
   advanced: [
-    { title: "Members", url: "/members", icon: Users },
+    { title: "Chatbot Members", url: "/chatbot-members", icon: Users },
+    { title: "Account Members", url: "/account-members", icon: Users },
+    { title: "Referral", url: "/referral", icon: UserStar },
     { title: "Integrations", url: "/integrations", icon: Plug },
+    { title: "Webhooks", url: "/webhooks", icon: Zap },
     { title: "Settings", url: "/settings", icon: Settings },
   ],
 };
+
+// Sidebar items visible to AGENT role only
+const AGENT_ALLOWED_URLS = [
+  "/dashboard",
+  "/chat-history",
+  "/members",
+  "/settings",
+];
+
+function filterForAgent(items) {
+  return items.filter((item) => AGENT_ALLOWED_URLS.includes(item.url));
+}
 
 export function AppSidebar() {
   const { user } = useAuth();
   const { selectedChatbot } = useChatbot();
   const router = useRouter();
+  const isAgent = selectedChatbot?.userRole === "AGENT";
+
+  const navMain = isAgent ? filterForAgent(data.navMain) : data.navMain;
+  const knowledgeBase = isAgent ? [] : data.knowledgeBase;
+  const customizations = isAgent ? [] : data.customizations;
+  const advanced = isAgent ? filterForAgent(data.advanced) : data.advanced;
 
   return (
     <Sidebar collapsible="icon">
@@ -313,7 +346,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {data.navMain.map((item) => (
+              {navMain.map((item) => (
                 <NavItem key={item.title} item={item} />
               ))}
             </SidebarMenu>
@@ -321,48 +354,63 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Knowledge Base */}
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground/70 text-[11px] font-bold tracking-wider uppercase">
-            Knowledge Base
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {data.knowledgeBase.map((item) => (
-                <NavItem key={item.title} item={item} />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {knowledgeBase.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-muted-foreground/70 text-[11px] font-bold tracking-wider uppercase">
+              Knowledge Base
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {knowledgeBase.map((item) => (
+                  <NavItem key={item.title} item={item} />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Customizations */}
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground/70 text-[11px] font-bold tracking-wider uppercase">
-            Customizations
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {data.customizations.map((item) => (
-                <NavItem key={item.title} item={item} />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {customizations.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-muted-foreground/70 text-[11px] font-bold tracking-wider uppercase">
+              Customizations
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {customizations.map((item) => (
+                  <NavItem key={item.title} item={item} />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Advanced */}
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground/70 text-[11px] font-bold tracking-wider uppercase">
-            Advanced
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {data.advanced.map((item) => (
-                <NavItem key={item.title} item={item} />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {advanced.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-muted-foreground/70 text-[11px] font-bold tracking-wider uppercase">
+              Advanced
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {advanced.map((item) => (
+                  <NavItem key={item.title} item={item} />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="What's New" data-featurebase-changelog>
+              <Megaphone className="h-4 w-4" />
+              <span>What's New</span>
+              <span id="fb-update-badge" className="ml-auto" />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <NavUser
           user={{
             name: user?.name || "User Name",
@@ -378,11 +426,18 @@ export function AppSidebar() {
 
 function NavItem({ item }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { guardNavigation } = useUnsavedChanges();
   const hasItems = item.items && item.items.length > 0;
 
   // Check if current page is this item or one of its sub-items
   const isActive =
     pathname === item.url || item.items?.some((sub) => sub.url === pathname);
+
+  const handleClick = (e, href) => {
+    e.preventDefault();
+    guardNavigation(() => router.push(href));
+  };
 
   if (!hasItems) {
     return (
@@ -392,10 +447,14 @@ function NavItem({ item }) {
           tooltip={item.title}
           isActive={pathname === item.url}
         >
-          <Link href={item.url} className="flex items-center gap-2">
+          <a
+            href={item.url}
+            onClick={(e) => handleClick(e, item.url)}
+            className="flex items-center gap-2"
+          >
             {item.icon && <item.icon />}
             <span>{item.title}</span>
-          </Link>
+          </a>
         </SidebarMenuButton>
         {item.badge && (
           <SidebarMenuBadge className="bg-emerald-100 text-[10px] font-bold text-emerald-700">
@@ -424,9 +483,13 @@ function NavItem({ item }) {
             {item.items.map((subItem) => (
               <SidebarMenuItem key={subItem.title}>
                 <SidebarMenuButton asChild isActive={pathname === subItem.url}>
-                  <Link href={subItem.url} className="pl-4">
+                  <a
+                    href={subItem.url}
+                    onClick={(e) => handleClick(e, subItem.url)}
+                    className="pl-4"
+                  >
                     <span>{subItem.title}</span>
-                  </Link>
+                  </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}

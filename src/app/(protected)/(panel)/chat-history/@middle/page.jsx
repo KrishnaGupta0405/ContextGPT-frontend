@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useAuth } from "@/context/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/axios";
+import { useChattingSocket } from "@/context/ChattingSocketContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -53,17 +55,45 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Check, X, Trash2, Pencil } from "lucide-react";
 import BottomBar from "./BottomBar";
+import { PlatformBadge } from "@/components/ui/PlatformBadge";
+
+const formatThreadTime = (dateStr) => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  if (isToday) return time;
+  if (isYesterday) return `Yesterday, ${time}`;
+
+  const isThisYear = date.getFullYear() === now.getFullYear();
+  const dateOpts = isThisYear
+    ? { month: "short", day: "numeric" }
+    : { month: "short", day: "numeric", year: "numeric" };
+  return `${date.toLocaleDateString([], dateOpts)}, ${time}`;
+};
 
 const ChatHistoryMiddle = () => {
   const { selectedChatbot } = useChatbot();
+  const { account } = useAuth();
+  const { isConnected, send, addListener } = useChattingSocket() || {};
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [filter, setFilter] = useState("open");
   const [downloading, setDownloading] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [editingThreadId, setEditingThreadId] = useState(null);
   const [editedTitle, setEditedTitle] = useState("");
   const [selectedVisitor, setSelectedVisitor] = useState("all");
+  const [fadingThreadIds, setFadingThreadIds] = useState(new Set());
 
   const handleDownload = async () => {
     try {
@@ -130,42 +160,141 @@ const ChatHistoryMiddle = () => {
   const searchParams = useSearchParams();
   const selectedThreadId = searchParams.get("threadId");
 
-  const fetchThreads = async () => {
+  const fetchThreads = useCallback(async (pageNum = 1, append = false) => {
     if (!selectedChatbot?.id) return;
 
-    setLoading(true);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     try {
-      const cacheKey = `chat_threads_${selectedChatbot.id}`;
-      const cachedData = sessionStorage.getItem(cacheKey);
+      const cacheKey = `chat_threads_${selectedChatbot.id}_${filter}`;
 
-      if (cachedData) {
-        setThreads(JSON.parse(cachedData));
+      if (!append) {
+        const cachedData = sessionStorage.getItem(cacheKey);
+        if (cachedData) {
+          setThreads(JSON.parse(cachedData));
+        }
       }
 
-      const response = await api.get(`/chatting/${selectedChatbot.id}/threads`);
+      // Build query params based on active filter
+      const params = new URLSearchParams({ page: pageNum, limit: 20 });
+      switch (filter) {
+        case "open":
+          params.set("resolved", "false");
+          params.set("archived", "false");
+          break;
+        case "escalated":
+          params.set("escalated", "true");
+          break;
+        case "important":
+          params.set("important", "true");
+          break;
+        case "resolved":
+          params.set("resolved", "true");
+          break;
+        case "archived":
+          params.set("archived", "true");
+          break;
+        // "all" — no extra filters
+      }
+
+      const response = await api.get(
+        `/chatting/${selectedChatbot.id}/threads?${params.toString()}`
+      );
 
       if (response.data?.success) {
-        // Add title field if missing from response but present in cache?
-        // Actually response data should be source of truth.
-        // We might want to preserve titles if they are local changes not yet persisted?
-        // But here we just set new threads.
         const newThreads = response.data.data.threads;
-        setThreads(newThreads);
-        sessionStorage.setItem(cacheKey, JSON.stringify(newThreads));
-        console.log(newThreads);
+        const pagination = response.data.data.pagination;
+
+        // Stop if API returned empty threads (page beyond actual data)
+        if (newThreads.length === 0) {
+          setHasMore(false);
+          return;
+        }
+
+        if (append) {
+          setThreads((prev) => [...prev, ...newThreads]);
+        } else {
+          setThreads(newThreads);
+          sessionStorage.setItem(cacheKey, JSON.stringify(newThreads));
+        }
+
+        setPage(pageNum);
+        setHasMore(pageNum < pagination.totalPages);
+      } else {
+        // API returned success: false — stop trying to load more
+        if (append) setHasMore(false);
       }
     } catch (error) {
       console.error("Failed to fetch threads:", error);
+      // Stop infinite retry on error
+      if (append) setHasMore(false);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  };
+  }, [selectedChatbot?.id, filter]);
 
+  // Always keep a ref to the latest fetchThreads so socket listeners
+  // never capture a stale closure.
+  const fetchThreadsRef = useRef(fetchThreads);
   useEffect(() => {
-    fetchThreads();
-  }, [selectedChatbot?.id]);
+    fetchThreadsRef.current = fetchThreads;
+  }, [fetchThreads]);
 
-  // Listen for thread updates from other components
+  // Re-fetch when chatbot or filter changes
+  useEffect(() => {
+    setPage(1);
+    setHasMore(true);
+    setSelectedThreadIds(new Set());
+    fetchThreads(1, false);
+  }, [selectedChatbot?.id, filter]);
+
+  const scrollAreaRef = useRef(null);
+
+  const loadMoreThreads = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    fetchThreads(page + 1, true);
+  }, [hasMore, page, loadingMore, fetchThreads]);
+
+  // Fetch chatbot appearance icons once per chatbot and store in sessionStorage
+  useEffect(() => {
+    const fetchAppearance = async () => {
+      if (!account?.id || !selectedChatbot?.id) return;
+      const cacheKey = `chatbot_appearance_${selectedChatbot.id}`;
+      if (sessionStorage.getItem(cacheKey)) return; // already cached
+      try {
+        const response = await api.get(
+          `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/appearance`,
+        );
+        if (response.data?.success) {
+          const { botIconSrc, userIconSrc, agentIconSrc } = response.data.data;
+          sessionStorage.setItem(
+            cacheKey,
+            JSON.stringify({ botIconSrc, userIconSrc, agentIconSrc }),
+          );
+          // Notify @right slot in case it mounted before this fetch completed
+          window.dispatchEvent(
+            new CustomEvent("chatbot-appearance-loaded", {
+              detail: {
+                chatbotId: selectedChatbot.id,
+                botIconSrc,
+                userIconSrc,
+                agentIconSrc,
+              },
+            }),
+          );
+        }
+      } catch (error) {
+        console.error("Failed to fetch chatbot appearance:", error);
+      }
+    };
+    fetchAppearance();
+  }, [account?.id, selectedChatbot?.id]);
+
+  // Listen for thread updates from other components (within-page cross-slot events)
   useEffect(() => {
     const handleThreadUpdate = (event) => {
       const { threadId, title } = event.detail;
@@ -180,6 +309,95 @@ const ChatHistoryMiddle = () => {
     };
   }, []);
 
+  // Subscribe to the chatbot channel over WebSocket
+  useEffect(() => {
+    if (!selectedChatbot?.id || !isConnected || !send) return;
+    send({ type: "subscribe:chatbot", chatbotId: selectedChatbot.id });
+  }, [selectedChatbot?.id, isConnected, send]);
+
+  // React to real-time thread events pushed by the server
+  useEffect(() => {
+    if (!addListener || !selectedChatbot?.id) return;
+
+    // A new thread was created — always call through the ref so we never
+    // invoke a stale closure of fetchThreads.
+    const unsubNew = addListener("thread:new", ({ chatbotId }) => {
+      if (chatbotId === selectedChatbot.id) {
+        fetchThreadsRef.current();
+      }
+    });
+
+    // A thread's metadata was updated (status, title, escalation, etc.)
+    const unsubUpdated = addListener("thread:updated", (thread) => {
+      if (thread?.chatbotId === selectedChatbot.id) {
+        // Check if this thread will leave the current filter — fade it out
+        const wouldMatch = (() => {
+          switch (filter) {
+            case "open": return !(thread.resolved ?? false) && !(thread.archived ?? false);
+            case "escalated": return !!thread.escalated;
+            case "important": return !!thread.important;
+            case "resolved": return !!thread.resolved;
+            case "archived": return !!thread.archived;
+            case "all": return true;
+            default: return true;
+          }
+        })();
+
+        if (!wouldMatch && filter !== "all") {
+          setFadingThreadIds((prev) => new Set([...prev, thread.id]));
+          setTimeout(() => {
+            setThreads((prev) =>
+              prev.map((t) => (t.id === thread.id ? { ...t, ...thread } : t)),
+            );
+            setFadingThreadIds((prev) => {
+              const next = new Set(prev);
+              next.delete(thread.id);
+              return next;
+            });
+          }, 400);
+        } else {
+          setThreads((prev) =>
+            prev.map((t) => (t.id === thread.id ? { ...t, ...thread } : t)),
+          );
+        }
+      }
+    });
+
+    // A new message arrived — update thread's last message preview and bump to top
+    const unsubMessage = addListener("message:new", (message) => {
+      if (!message?.threadId) return;
+      setThreads((prev) => {
+        const idx = prev.findIndex((t) => t.id === message.threadId);
+        if (idx === -1) return prev;
+        const updated = {
+          ...prev[idx],
+          lastMessageContent: message.content,
+          lastMessageRole: message.role,
+          updatedAt: message.createdAt || new Date().toISOString(),
+        };
+        // Move thread to top of list
+        return [updated, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+      });
+    });
+
+    // Thread was reset (visitor sent !reset) — old thread ended, new one created
+    const unsubReset = addListener("thread:reset", (data) => {
+      if (!data) return;
+      // Remove old thread and refetch to pick up the new one
+      if (data.oldThreadId) {
+        setThreads((prev) => prev.filter((t) => t.id !== data.oldThreadId));
+      }
+      fetchThreadsRef.current();
+    });
+
+    return () => {
+      unsubNew();
+      unsubUpdated();
+      unsubMessage();
+      unsubReset();
+    };
+  }, [addListener, selectedChatbot?.id]);
+
   const handleThreadSelect = (threadId) => {
     const params = new URLSearchParams(searchParams);
     params.set("threadId", threadId);
@@ -189,6 +407,12 @@ const ChatHistoryMiddle = () => {
     if (thread) {
       sessionStorage.setItem(`thread_meta_${threadId}`, JSON.stringify(thread));
     }
+    // Clear unread badge immediately in local state
+    setThreads((prev) =>
+      prev.map((t) =>
+        t.id === threadId ? { ...t, unreadMessagesCount: 0 } : t,
+      ),
+    );
   };
 
   const toggleSelectAll = () => {
@@ -231,18 +455,13 @@ const ChatHistoryMiddle = () => {
           case "unimportant":
             updateObj.important = false;
             break;
+          case "archive":
+            updateObj.archived = true;
+            break;
+          case "unarchive":
+            updateObj.archived = false;
+            break;
           case "delete":
-            // Assuming "archived" or strict delete. The prompt mentions "delete" in UI but
-            // usually this might be archive or hard delete.
-            // API payload example didn't explicitly show delete, but user asked for "delete" option.
-            // I'll assume archived=true for soft delete or strict delete if API supports it.
-            // Given the prompt example: "archived": false. Let's send archived: true for delete for now,
-            // or if there's a specific delete flag.
-            // The user request payload example showed keys like "resolved", "archived", "important".
-            // I'll use "archived": true for the "Delete" button as a safe default for "soft delete",
-            // or if the user really wants DELETE, it might be a different method.
-            // But based on the payload structure `update-thread`, it's likely an update.
-            // Let's stick to valid keys observed: resolved, archived, important.
             updateObj.archived = true;
             break;
           default:
@@ -262,24 +481,60 @@ const ChatHistoryMiddle = () => {
 
         // Flatten the array of arrays
         const allUpdatedThreads = updatedBatches.flat();
+        const updatedMap = new Map(allUpdatedThreads.map((t) => [t.id, t]));
 
-        // Update local state
-        setThreads((prevThreads) => {
-          const updatedMap = new Map(allUpdatedThreads.map((t) => [t.id, t]));
-          return prevThreads.map((t) => {
-            if (updatedMap.has(t.id)) {
-              return updatedMap.get(t.id);
-            }
-            // If "delete" action was actually "archive", and we want to remove from view
-            // if we are filtering, that's handled by `filteredThreads`.
-            // If it's a hard delete, we'd need to filter it out.
-            // But since we sent "archived": true, it's an update.
-            return t;
-          });
-        });
+        // Determine which threads will no longer match the current filter
+        const wouldFilter = (thread) => {
+          if (selectedVisitor !== "all" && thread.visitorId !== selectedVisitor) return false;
+          switch (filter) {
+            case "open": return !thread.resolved && !thread.archived;
+            case "escalated": return thread.escalated;
+            case "important": return thread.important;
+            case "resolved": return thread.resolved;
+            case "archived": return thread.archived;
+            case "all": return true;
+            default: return true;
+          }
+        };
+
+        const idsToFade = new Set();
+        for (const [id, updated] of updatedMap) {
+          if (!wouldFilter(updated)) {
+            idsToFade.add(id);
+          }
+        }
+
+        // Start fade-out animation for threads leaving the filter
+        if (idsToFade.size > 0) {
+          setFadingThreadIds(idsToFade);
+          // After animation, apply the actual state update and remove fading
+          setTimeout(() => {
+            setThreads((prevThreads) =>
+              prevThreads.map((t) => (updatedMap.has(t.id) ? updatedMap.get(t.id) : t))
+            );
+            setFadingThreadIds(new Set());
+          }, 400);
+        } else {
+          // No threads leaving the filter, update immediately
+          setThreads((prevThreads) =>
+            prevThreads.map((t) => (updatedMap.has(t.id) ? updatedMap.get(t.id) : t))
+          );
+        }
+
+        // Update threads that stay in the filter immediately (non-fading ones)
+        if (idsToFade.size > 0) {
+          setThreads((prevThreads) =>
+            prevThreads.map((t) => {
+              if (updatedMap.has(t.id) && !idsToFade.has(t.id)) {
+                return updatedMap.get(t.id);
+              }
+              return t;
+            })
+          );
+        }
 
         toast.success("Threads updated successfully");
-        setSelectedThreadIds(new Set()); // Clear selection
+        setSelectedThreadIds(new Set());
       }
     } catch (error) {
       console.error("Bulk update failed:", error);
@@ -316,7 +571,7 @@ const ChatHistoryMiddle = () => {
         setEditingThreadId(null);
 
         // Update cache
-        const cacheKey = `chat_threads_${selectedChatbot.id}`;
+        const cacheKey = `chat_threads_${selectedChatbot.id}_${filter}`;
         const cachedData = sessionStorage.getItem(cacheKey);
         if (cachedData) {
           const threads = JSON.parse(cachedData);
@@ -368,37 +623,18 @@ const ChatHistoryMiddle = () => {
     return Array.from(visitors.values());
   }, [threads]);
 
+  // Filtering is now done server-side; only apply visitor filter client-side
   const filteredThreads = threads.filter((thread) => {
-    // Visitor filter
+    if (fadingThreadIds.has(thread.id)) return true;
     if (selectedVisitor !== "all" && thread.visitorId !== selectedVisitor) {
       return false;
     }
-
-    switch (filter) {
-      case "open":
-        return !thread.resolved;
-      case "escalated":
-        return thread.escalated;
-      case "important":
-        return thread.important;
-      case "resolved":
-        return thread.resolved;
-      case "archived":
-        return thread.archived;
-      case "all":
-        return true;
-      default:
-        return true;
-    }
+    return true;
   });
 
+  // Counts reflect loaded threads for the active server-side filter
   const counts = {
-    open: threads.filter((t) => !t.resolved).length,
-    escalated: threads.filter((t) => t.escalated).length,
-    important: threads.filter((t) => t.important).length,
-    resolved: threads.filter((t) => t.resolved).length,
-    archived: threads.filter((t) => t.archived).length,
-    all: threads.length,
+    [filter]: filteredThreads.length,
   };
 
   if (!selectedChatbot) {
@@ -510,40 +746,22 @@ const ChatHistoryMiddle = () => {
               <DropdownMenuRadioGroup value={filter} onValueChange={setFilter}>
                 <DropdownMenuRadioItem value="open" className="text-sm">
                   Open
-                  <span className="text-muted-foreground ml-auto text-[10px]">
-                    {counts.open}
-                  </span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="escalated" className="text-sm">
                   Escalated
-                  <span className="text-muted-foreground ml-auto text-[10px]">
-                    {counts.escalated}
-                  </span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="important" className="text-sm">
                   Important
-                  <span className="text-muted-foreground ml-auto text-[10px]">
-                    {counts.important}
-                  </span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="resolved" className="text-sm">
                   Resolved
-                  <span className="text-muted-foreground ml-auto text-[10px]">
-                    {counts.resolved}
-                  </span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="archived" className="text-sm">
                   Archived
-                  <span className="text-muted-foreground ml-auto text-[10px]">
-                    {counts.archived}
-                  </span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuRadioItem value="all" className="text-sm">
                   All Threads
-                  <span className="text-muted-foreground ml-auto text-[10px]">
-                    {counts.all}
-                  </span>
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
@@ -591,7 +809,7 @@ const ChatHistoryMiddle = () => {
         </div>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1">
         <div className="flex flex-col p-2">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => (
@@ -609,7 +827,8 @@ const ChatHistoryMiddle = () => {
               No {filter !== "all" ? filter : ""} chat threads found.
             </p>
           ) : (
-            filteredThreads.map((thread) => {
+            <>
+            {filteredThreads.map((thread) => {
               const isSelected = selectedThreadIds.has(thread.id);
               const isActive = selectedThreadId === thread.id;
 
@@ -617,12 +836,18 @@ const ChatHistoryMiddle = () => {
                 <div
                   key={thread.id}
                   className={cn(
-                    "group/thread relative flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-colors",
+                    "group/thread relative flex cursor-pointer items-start gap-3 rounded-lg p-3 overflow-hidden",
                     isActive
                       ? "bg-blue-50/80 dark:bg-blue-950/20"
                       : "hover:bg-muted/40",
                     isSelected && "bg-muted/30",
                   )}
+                  style={{
+                    transition: "opacity 350ms ease, max-height 350ms ease, padding 350ms ease, margin 350ms ease",
+                    ...(fadingThreadIds.has(thread.id)
+                      ? { opacity: 0, maxHeight: 0, paddingTop: 0, paddingBottom: 0, marginBottom: 0, pointerEvents: "none" }
+                      : { opacity: 1, maxHeight: "200px" }),
+                  }}
                   onClick={() => handleThreadSelect(thread.id)}
                 >
                   {/* Hover/Selected State Indicator line or background handled by class above */}
@@ -733,30 +958,23 @@ const ChatHistoryMiddle = () => {
                           </Badge>
                         )}
                         <span className="text-muted-foreground text-[10px] whitespace-nowrap">
-                          {new Date(
-                            thread.createdAt || Date.now(),
-                          ).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {formatThreadTime(thread.startedAt || thread.createdAt)}
                         </span>
                         <Separator orientation="vertical" className="h-3" />
                         <span className="text-muted-foreground text-[10px] whitespace-nowrap">
-                          {new Date(
-                            thread.updatedAt || Date.now(),
-                          ).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {thread.resolved && thread.endedAt
+                            ? `Ended ${formatThreadTime(thread.endedAt)}`
+                            : formatThreadTime(thread.updatedAt)}
                         </span>
                       </div>
                     </div>
 
                     <p className="text-muted-foreground line-clamp-2 text-xs leading-tight">
-                      {/* Mocking last message content as it's not in thread list API typically, or using tags as a fallback */}
-                      {thread.tags && thread.tags.length > 0
-                        ? thread.tags.join(", ")
-                        : "No preview available..."}
+                      {thread.lastMessageContent
+                        ? `${thread.lastMessageRole === "user" ? "Visitor: " : "AI: "}${thread.lastMessageContent}`
+                        : thread.tags && thread.tags.length > 0
+                          ? thread.tags.join(", ")
+                          : "No preview available..."}
                     </p>
 
                     <div
@@ -818,11 +1036,44 @@ const ChatHistoryMiddle = () => {
                           </TooltipContent>
                         </Tooltip>
                       )}
+
+                      {thread.platformSource && thread.platformSource !== "WIDGET" && (
+                        <PlatformBadge platform={thread.platformSource} iconOnly />
+                      )}
                     </div>
                   </div>
                 </div>
               );
-            })
+            })}
+            {hasMore ? (
+              <div className="flex justify-center py-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadMoreThreads}
+                  disabled={loadingMore}
+                  className="gap-2"
+                >
+                  {loadingMore ? (
+                    <Spinner className="h-4 w-4 text-blue-600" />
+                  ) : (
+                    <RotateCw className="h-3.5 w-3.5" />
+                  )}
+                  {loadingMore ? "Loading..." : "Load More"}
+                </Button>
+              </div>
+            ) : (
+              filteredThreads.length > 0 && (
+                <div className="flex items-center justify-center gap-2 py-4">
+                  <div className="bg-border h-px flex-1" />
+                  <span className="text-muted-foreground text-xs whitespace-nowrap">
+                    End of conversations
+                  </span>
+                  <div className="bg-border h-px flex-1" />
+                </div>
+              )
+            )}
+            </>
           )}
         </div>
       </ScrollArea>
@@ -834,6 +1085,8 @@ const ChatHistoryMiddle = () => {
         onUnresolve={() => handleBulkUpdate("unresolve")}
         onImportant={() => handleBulkUpdate("important")}
         onUnimportant={() => handleBulkUpdate("unimportant")}
+        onArchive={() => handleBulkUpdate("archive")}
+        onUnarchive={() => handleBulkUpdate("unarchive")}
         onDelete={() => handleBulkUpdate("delete")}
         onClearSelection={() => setSelectedThreadIds(new Set())}
         updating={bulkUpdating}

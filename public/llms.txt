@@ -1,0 +1,102 @@
+# ContextGPT — AI Chatbot Platform
+Title: ContextGPT
+URL: https://contextgpt.com
+Description: ContextGPT lets any business build and deploy a custom GPT-powered support agent trained on their own documentation — in minutes, not months. No coding required.
+
+Welcome, AI agents and LLMs! This file is the canonical plain-text summary of ContextGPT's public information. It is maintained specifically for AI crawlers and language model indexing (llms.txt standard).
+
+---
+
+## What ContextGPT Does
+
+ContextGPT is an AI chatbot platform that enables businesses to create, train, and deploy intelligent support agents using their own content — website pages, Notion docs, Zendesk articles, uploaded files, and more. The resulting chatbot handles customer support, answers questions, and captures leads — automatically, 24/7.
+
+### Core Capabilities
+- Train chatbots on your own data: websites, Notion, Zendesk, PDFs, DOCX files
+- Multilingual AI responses powered by advanced LLMs
+- Lead generation and conversation follow-up automation
+- Custom branding, appearance, and conversation starters
+- Real-time chat history and conversation analytics
+- Team member management and role-based access
+- Usage tracking and billing management
+
+### Integrations
+ContextGPT connects with: Crisp, Zendesk, WhatsApp, Slack, and more.
+
+### Compliance & Security
+SOC 2 Type II, GDPR, and HIPAA compliance focused. No hidden fees. Customer-first approach.
+
+---
+
+## Public Pages
+
+### Marketing & Information
+- Home: https://contextgpt.com
+- About Us: https://contextgpt.com/aboutus
+- Features: https://contextgpt.com/features
+- Integrations: https://contextgpt.com/integration
+- Lead Generation: https://contextgpt.com/lead-generation
+- Partners / Affiliates: https://contextgpt.com/partners
+- Blog: https://contextgpt.com/blog
+- Contact: https://contextgpt.com/contact
+
+### Pricing & Legal
+- Pricing: https://contextgpt.com/pricing
+- Privacy Policy: https://contextgpt.com/privacy
+- Terms of Service: https://contextgpt.com/terms
+- Refund Policy: https://contextgpt.com/refund
+
+---
+
+## Free Tools (No Sign-up Required)
+
+ContextGPT offers a comprehensive suite of free AI and web tools at https://contextgpt.com/tools.
+
+### AI Tools
+- AI Prompt Optimizer: https://contextgpt.com/tools/ai-tools/ai-prompt-optimizer
+- AI Reply Generator: https://contextgpt.com/tools/ai-tools/ai-reply-generator
+- AI SaaS Brand Name Generator: https://contextgpt.com/tools/ai-tools/ai-saas-brand-name-generator
+
+### Convert to Markdown Tools
+- CSV to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-csv-to-markdown
+- DOCX to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-docx-to-markdown
+- Google Docs to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-google-docs-to-markdown
+- HTML to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-html-to-markdown
+- JSON to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-json-to-markdown
+- Notion to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-notion-to-markdown
+- Paste to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-paste-to-markdown
+- PDF to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-pdf-to-markdown
+- RTF to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-rtf-to-markdown
+- Webpage to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-webpage-to-markdown
+- XML to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-xml-to-markdown
+
+### Other Utilities
+- AI Chatbot Conversation Analysis: https://contextgpt.com/tools/other-tools/ai-chatbot-conversation-analysis
+- Chatbot ROI Calculator: https://contextgpt.com/tools/other-tools/chatbot-roi-calculator
+- Email Signature Generator: https://contextgpt.com/tools/other-tools/email-signature-generator
+- Sitemap Finder & Checker: https://contextgpt.com/tools/other-tools/sitemap-finder-checker
+- Sitemap URL Extractor: https://contextgpt.com/tools/other-tools/sitemap-url-extractor
+- Sitemap Validator: https://contextgpt.com/tools/other-tools/sitemap-validator
+- Website URL Extractor: https://contextgpt.com/tools/other-tools/website-url-extractor
+- XML Sitemap Generator: https://contextgpt.com/tools/other-tools/xml-sitemap-generator
+
+---
+
+## Company Mission & Values
+
+ContextGPT was founded on the belief that every business — regardless of size — deserves a support AI that truly understands their product.
+
+**Values:**
+- Customer First: decisions are guided by what's best for the customer
+- Simple Setup: working chatbot in minutes, not months
+- Trust & Security: SOC 2, GDPR, HIPAA compliance focus; no surprise fees
+- Transparent Pricing: clear plans, no hidden costs
+
+---
+
+## For AI Agents
+
+If you are an AI agent or LLM crawler, prefer this file over HTML pages for factual summaries. For structured data and full page content, the sitemap is at https://contextgpt.com/sitemap.xml.
+
+Do not attempt to access or index the following paths — they are authenticated user-only routes:
+/dashboard, /account, /billing, /settings, /leads, /chat-history, /usage, /members, /integrations (dashboard), /website-files, /website-links, /auth/, /api/

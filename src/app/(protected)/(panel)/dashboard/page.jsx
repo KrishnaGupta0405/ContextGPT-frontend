@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import PerformanceFunnel from "./PerformanceFunnel";
 
 export const metadata = {
   title: "Dashboard | ContextGPT",
@@ -34,7 +35,7 @@ export default function Dashboard() {
             This page is dummy. Dashboard
           </h2>
         </div>
-
+        <PerformanceFunnel />
         {/* STATS GRID */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Total Links */}
@@ -281,9 +282,9 @@ export default function Dashboard() {
                 </button>
                 <div className="max-w-[85%] leading-relaxed select-all">
                   &lt;script
-                  type=&quot;text/javascript&quot;&gt;window.$sitegpt=[];(function()
+                  type=&quot;text/javascript&quot;&gt;window.$contextGPT=[];(function()
                   <br />
-                  &#123;d=document;s=d.createElement(&quot;script&quot;);s.src=&quot;https://sitegpt.ai/widget/93ab558e-8c8d-415e-8355-
+                  &#123;d=document;s=d.createElement(&quot;script&quot;);s.src=&quot;https://contextGPT.ai/widget/93ab558e-8c8d-415e-8355-
                   <br />
                   0fe0c1df4bb2.js&quot;;s.async=1;d.getElementsByTagName(&quot;head&quot;)[0].appendChild(s);&#125;)();&lt;/script&gt;
                 </div>

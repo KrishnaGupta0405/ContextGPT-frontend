@@ -171,9 +171,10 @@ export default function SignupPage() {
         },
       });
 
-      toast.success("Account created successfully!", {
+      toast.success("Account created! Please check your email.", {
         id: toastId,
-        description: "Welcome to ContextGPT. You can now sign in.",
+        description:
+          "We sent a verification link to your email. Click it to activate your account before logging in.",
       });
       console.log("Signup response:", response);
 

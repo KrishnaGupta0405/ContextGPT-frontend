@@ -29,15 +29,40 @@ import {
   Clock,
   ExternalLink,
   Loader2,
+  Monitor,
+  Smartphone,
+  ShieldAlert,
+  Wifi,
+  Trash2,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ProfileAvatar } from "./ProfileAvatar";
 
 const Account = () => {
-  const { user, account, login } = useAuth();
+  const { user, account, login, logout } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savingDetails, setSavingDetails] = useState(false);
   const [savingLinks, setSavingLinks] = useState(false);
+
+  // Delete account state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteStep, setDeleteStep] = useState(1);
+  const [otpValue, setOtpValue] = useState("");
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  // Sessions state
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [revokingSessionId, setRevokingSessionId] = useState(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -78,6 +103,39 @@ const Account = () => {
 
     fetchProfile();
   }, []);
+
+  useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        setSessionsLoading(true);
+        const response = await api.get("/auth/sessions");
+        if (response.data.success) {
+          setSessions(response.data.data?.sessions || []);
+        }
+      } catch (error) {
+        console.error("Error fetching sessions:", error);
+      } finally {
+        setSessionsLoading(false);
+      }
+    };
+    fetchSessions();
+  }, []);
+
+  const handleRevokeSession = async (sessionId) => {
+    try {
+      setRevokingSessionId(sessionId);
+      const response = await api.post("/auth/revoke-session", { sessionId });
+      if (response.data.success) {
+        toast.success("Session revoked successfully");
+        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      }
+    } catch (error) {
+      console.error("Error revoking session:", error);
+      toast.error("Failed to revoke session.");
+    } finally {
+      setRevokingSessionId(null);
+    }
+  };
 
   const handleChange = (e) => {
     const { id, value } = e.target;
@@ -136,6 +194,50 @@ const Account = () => {
     } finally {
       if (section === "personal") setSavingDetails(false);
       if (section === "social") setSavingLinks(false);
+    }
+  };
+
+  const openDeleteDialog = () => {
+    setDeleteStep(1);
+    setOtpValue("");
+    setDeleteDialogOpen(true);
+  };
+
+  const handleSendOtp = async () => {
+    try {
+      setSendingOtp(true);
+      const response = await api.post("/users/delete-account/send-otp");
+      if (response.data.success) {
+        toast.success("OTP sent to your email address.");
+        setDeleteStep(2);
+      }
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Failed to send OTP. Try again.",
+      );
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      setDeletingAccount(true);
+      const response = await api.delete("/users/delete-account", {
+        data: { otp: otpValue },
+      });
+      if (response.data.success) {
+        setDeleteDialogOpen(false);
+        toast.success("Account deleted successfully. Goodbye!");
+        logout();
+      }
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      toast.error(
+        error?.response?.data?.message || "Failed to delete account.",
+      );
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -280,7 +382,86 @@ const Account = () => {
             </CardFooter>
           </Card>
 
+          {/* Active Sessions Card */}
           <Card className="border shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Monitor className="h-5 w-5 text-slate-500" />
+                Active Sessions
+              </CardTitle>
+              <CardDescription>
+                These are all the devices currently logged into your account.
+                Revoke any session you don't recognise.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {sessionsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                </div>
+              ) : sessions.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  No active sessions found.
+                </p>
+              ) : (
+                sessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3"
+                  >
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500">
+                        {session.deviceInfo
+                          ?.toLowerCase()
+                          .includes("mobile") ? (
+                          <Smartphone className="h-4 w-4" />
+                        ) : (
+                          <Monitor className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start gap-2">
+                          <p className="text-sm font-medium text-slate-800 break-words flex-1">
+                            {session.deviceInfo || "Unknown Device"}
+                          </p>
+                          {session.isCurrent && (
+                            <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700">
+                              <Wifi className="h-3 w-3" /> Current
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {session.ipAddress} &middot; Signed in{" "}
+                          {formatDate(session.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                    {!session.isCurrent && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-3 shrink-0 text-red-500 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => handleRevokeSession(session.id)}
+                        disabled={revokingSessionId === session.id}
+                      >
+                        {revokingSessionId === session.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <ShieldAlert className="mr-1.5 h-4 w-4" />
+                            Revoke
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* <Card className="border shadow-sm">
             <CardHeader>
               <CardTitle>Social Profiles</CardTitle>
               <CardDescription>
@@ -490,9 +671,171 @@ const Account = () => {
                 )}
               </Button>
             </CardFooter>
+          </Card> */}
+
+          {/* Danger Zone */}
+          <Card className="border-red-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-600">
+                <Trash2 className="h-5 w-5" />
+                Danger Zone
+              </CardTitle>
+              <CardDescription>
+                Permanently delete your account and all associated data. This
+                action cannot be undone.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="border-t border-red-100 pt-6">
+              <Button
+                variant="destructive"
+                onClick={openDeleteDialog}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Account
+              </Button>
+            </CardFooter>
           </Card>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog — 2-step OTP flow */}
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!deletingAccount) setDeleteDialogOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              Delete Account
+            </DialogTitle>
+            <DialogDescription>Read carefully before proceeding.</DialogDescription>
+          </DialogHeader>
+
+          {deleteStep === 1 ? (
+            <>
+              {/* What will be deleted */}
+              <div className="space-y-3 py-1">
+                <p className="text-sm font-semibold text-slate-700">
+                  The following will be permanently deleted:
+                </p>
+                <ul className="space-y-1.5 text-sm text-slate-600">
+                  {[
+                    "Your user profile and login credentials",
+                    "All workspaces (accounts) you own",
+                    "Every chatbot and its trained data (files, S3, Pinecone vectors)",
+                    "All uploaded documents and media (ImageKit / S3)",
+                    "API keys, sessions, usage history, and logs",
+                    "Active subscription — cancelled immediately",
+                    "All active add-ons — expired immediately",
+                    "All pending invitations sent by you",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="mt-0.5 text-red-500">✕</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* No-refund warning */}
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <strong>No refunds.</strong> Any remaining subscription period or
+                  unused add-on credits will be forfeited. There are no exceptions.
+                </div>
+
+                <p className="text-sm text-slate-500">
+                  This action is{" "}
+                  <span className="font-semibold text-red-600">irreversible</span>.
+                  We will send a one-time code to your email to confirm.
+                </p>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteDialogOpen(false)}
+                  disabled={sendingOtp}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleSendOtp}
+                  disabled={sendingOtp}
+                >
+                  {sendingOtp ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending OTP...
+                    </>
+                  ) : (
+                    "Send OTP & Continue"
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="space-y-3 py-1">
+                <p className="text-sm text-slate-600">
+                  Enter the 6-digit OTP sent to your email address to confirm
+                  account deletion.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="otp">One-Time Password</Label>
+                  <Input
+                    id="otp"
+                    value={otpValue}
+                    onChange={(e) => setOtpValue(e.target.value)}
+                    placeholder="Enter 6-digit OTP"
+                    maxLength={6}
+                    disabled={deletingAccount}
+                  />
+                </div>
+                <p className="text-xs text-slate-400">
+                  Didn't receive it?{" "}
+                  <button
+                    className="text-red-500 underline hover:text-red-700 disabled:opacity-50"
+                    onClick={handleSendOtp}
+                    disabled={sendingOtp}
+                  >
+                    {sendingOtp ? "Sending..." : "Resend OTP"}
+                  </button>
+                </p>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteStep(1)}
+                  disabled={deletingAccount}
+                >
+                  Back
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteAccount}
+                  disabled={deletingAccount || otpValue.length !== 6}
+                >
+                  {deletingAccount ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting account...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Permanently Delete
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

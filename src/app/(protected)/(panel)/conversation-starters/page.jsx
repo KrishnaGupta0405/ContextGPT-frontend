@@ -6,15 +6,14 @@ import { PanelNavbar } from "@/components/navbar/PanelNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import {
   PlayCircle,
   ChevronUp,
   ChevronDown,
-  Trash2,
-  Edit2,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/axios";
@@ -22,6 +21,7 @@ import api from "@/lib/axios";
 const ConversationStarters = () => {
   const { account } = useAuth();
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
 
   const [starters, setStarters] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,6 +39,11 @@ const ConversationStarters = () => {
       fetchStarters();
     }
   }, [account?.id, selectedChatbot?.id]);
+
+  // Clean up dirty state when leaving the page
+  useEffect(() => {
+    return () => markClean();
+  }, []);
 
   const fetchStarters = async () => {
     setIsLoading(true);
@@ -63,6 +68,7 @@ const ConversationStarters = () => {
     setButtonLabel("");
     setMessageText("");
     setLinkUrl("");
+    markClean();
   };
 
   const handleEdit = (starter) => {
@@ -80,6 +86,7 @@ const ConversationStarters = () => {
       setButtonLabel("");
       setMessageText("");
     }
+    markClean(); // loading an item to edit is not a "dirty" change
   };
 
   const handleDelete = async (id) => {
@@ -130,14 +137,12 @@ const ConversationStarters = () => {
 
       let response;
       if (editingId) {
-        // Update
         payload.id = editingId;
         response = await api.patch(
           `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/conversation-starters`,
           payload,
         );
       } else {
-        // Create
         response = await api.post(
           `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/conversation-starters`,
           payload,
@@ -149,7 +154,7 @@ const ConversationStarters = () => {
           response.data.message ||
             `Conversation starter ${editingId ? "updated" : "created"} successfully`,
         );
-        fetchStarters(); // Refresh list to get new IDs/timestamps
+        fetchStarters();
         resetForm();
       } else {
         toast.error(
@@ -161,6 +166,48 @@ const ConversationStarters = () => {
       toast.error("An error occurred while saving.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleMoveUp = async (index) => {
+    if (index === 0) return;
+    const newStarters = [...starters];
+    [newStarters[index - 1], newStarters[index]] = [
+      newStarters[index],
+      newStarters[index - 1],
+    ];
+    setStarters(newStarters);
+    try {
+      await api.patch(
+        `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/conversation-starters/reorder`,
+        { orderedIds: newStarters.map((s) => s.id) },
+      );
+      toast.success("Order updated successfully.");
+    } catch (error) {
+      console.error("Failed to reorder:", error);
+      toast.error("Failed to reorder conversation starters.");
+      fetchStarters();
+    }
+  };
+
+  const handleMoveDown = async (index) => {
+    if (index === starters.length - 1) return;
+    const newStarters = [...starters];
+    [newStarters[index], newStarters[index + 1]] = [
+      newStarters[index + 1],
+      newStarters[index],
+    ];
+    setStarters(newStarters);
+    try {
+      await api.patch(
+        `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/conversation-starters/reorder`,
+        { orderedIds: newStarters.map((s) => s.id) },
+      );
+      toast.success("Order updated successfully.");
+    } catch (error) {
+      console.error("Failed to reorder:", error);
+      toast.error("Failed to reorder conversation starters.");
+      fetchStarters();
     }
   };
 
@@ -199,7 +246,7 @@ const ConversationStarters = () => {
                 No conversation starters found.
               </div>
             ) : (
-              starters.map((starter) => (
+              starters.map((starter, index) => (
                 <div
                   key={starter.id}
                   className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -207,8 +254,24 @@ const ConversationStarters = () => {
                   <div className="mb-2 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="flex flex-col gap-0 text-slate-400">
-                        <ChevronUp className="h-4 w-4 cursor-pointer hover:text-slate-600" />
-                        <ChevronDown className="h-4 w-4 translate-y-[-4px] transform cursor-pointer hover:text-slate-600" />
+                        <ChevronUp
+                          className={cn(
+                            "h-4 w-4",
+                            index === 0
+                              ? "cursor-not-allowed text-slate-200"
+                              : "cursor-pointer hover:text-slate-600",
+                          )}
+                          onClick={() => handleMoveUp(index)}
+                        />
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 translate-y-[-4px] transform",
+                            index === starters.length - 1
+                              ? "cursor-not-allowed text-slate-200"
+                              : "cursor-pointer hover:text-slate-600",
+                          )}
+                          onClick={() => handleMoveDown(index)}
+                        />
                       </div>
                       <span
                         className={cn(
@@ -257,7 +320,10 @@ const ConversationStarters = () => {
                 </Label>
                 <Tabs
                   value={actionType}
-                  onValueChange={setActionType}
+                  onValueChange={(val) => {
+                    setActionType(val);
+                    markDirty();
+                  }}
                   className="w-full"
                 >
                   <TabsList className="grid w-full grid-cols-2 bg-slate-100 p-1">
@@ -285,7 +351,10 @@ const ConversationStarters = () => {
                   placeholder="e.g. Pricing, Contact us..."
                   className="h-10 rounded-lg border-slate-200"
                   value={buttonLabel}
-                  onChange={(e) => setButtonLabel(e.target.value)}
+                  onChange={(e) => {
+                    setButtonLabel(e.target.value);
+                    markDirty();
+                  }}
                 />
               </div>
 
@@ -296,10 +365,13 @@ const ConversationStarters = () => {
                       Message Text <span className="text-red-500">*</span>
                     </Label>
                     <textarea
-                      placeholder="e.g. What is the pricing of SiteGPT?"
+                      placeholder="e.g. What is the pricing of contextGPT?"
                       className="min-h-[120px] w-full resize-none rounded-lg border border-slate-200 p-3 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
                       value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
+                      onChange={(e) => {
+                        setMessageText(e.target.value);
+                        markDirty();
+                      }}
                     />
                   </>
                 ) : (
@@ -311,7 +383,10 @@ const ConversationStarters = () => {
                       placeholder="https://example.com/contact"
                       className="h-10 rounded-lg border-slate-200"
                       value={linkUrl}
-                      onChange={(e) => setLinkUrl(e.target.value)}
+                      onChange={(e) => {
+                        setLinkUrl(e.target.value);
+                        markDirty();
+                      }}
                     />
                   </>
                 )}

@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.not-protected-layout {
+  font-family: Open Sauce Sans, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", Segoe UI Symbol, "Noto Color Emoji";
+}
+
+/* Heading styles */
+.not-protected-layout h1,
+.not-protected-layout h2,
+.not-protected-layout h3,
+.not-protected-layout h4,
+.not-protected-layout h5,
+.not-protected-layout h6 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.not-protected-layout h1 {
+  font-weight: 700;
+}
+
+.not-protected-layout h2 {
+  font-weight: 700;
+}
+
+/* Paragraph styles */
+.not-protected-layout p,
+.not-protected-layout body,
+.not-protected-layout span,
+.not-protected-layout div {
+  font-weight: 400;
+}
+
+/* Additional text elements */
+.not-protected-layout li,
+.not-protected-layout a,
+.not-protected-layout button,
+.not-protected-layout input,
+.not-protected-layout textarea {
+  font-family: Open Sauce Sans, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", Segoe UI Symbol, "Noto Color Emoji";
+}

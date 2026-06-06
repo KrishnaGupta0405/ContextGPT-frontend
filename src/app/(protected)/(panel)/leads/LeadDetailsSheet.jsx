@@ -71,7 +71,11 @@ const LeadDetailsSheet = ({
     if (!noteText.trim()) return;
     setIsSubmittingNote(true);
     try {
-      await onUpdateVisitor(visitor.id, { internalNotes: noteText });
+      await onUpdateVisitor(visitor.id, {
+        internalNotes: noteText,
+        important: !!visitor.important,
+        achieved: !!(visitor.achieved || visitor.acheived),
+      });
       setNoteText("");
     } finally {
       setIsSubmittingNote(false);

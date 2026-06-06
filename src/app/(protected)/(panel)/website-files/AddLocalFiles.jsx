@@ -1,10 +1,15 @@
 "use client";
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, CloudUpload, File, X, Loader2 } from "lucide-react";
+import { ChevronLeft, CloudUpload, File, X, Loader2, BookOpen } from "lucide-react";
 import { useChatbot } from "@/context/ChatbotContext";
 import api from "@/lib/axios";
 import { toast } from "sonner";
+
+const CHARS_PER_PAGE = 2500;
+function estimatePages(fileSize) {
+  return Math.max(1, Math.ceil(Math.floor(fileSize * 0.85) / CHARS_PER_PAGE));
+}
 
 export function AddLocalFiles({ onBack, onAdd }) {
   const { selectedChatbot } = useChatbot();
@@ -71,7 +76,7 @@ export function AddLocalFiles({ onBack, onAdd }) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header section matches the screenshot's top area */}
       <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
         <Button
@@ -85,7 +90,7 @@ export function AddLocalFiles({ onBack, onAdd }) {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-6 sm:p-8">
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-8">
         <h2 className="mb-2 text-xl font-bold text-slate-800">
           Manually Upload File
         </h2>
@@ -112,7 +117,7 @@ export function AddLocalFiles({ onBack, onAdd }) {
               Choose a file to upload or drag & drop it here
             </h3>
             <p className="mb-6 text-sm text-slate-500">
-              PDF, CSV, TXT, DOCX formats, up to 10 MB.
+              PDF, TXT, DOC, DOCX, CSV, XLS, XLSX, PPT, PPTX, MD, HTML, RTF formats, up to 10 MB.
             </p>
             <Button
               variant="outline"
@@ -139,9 +144,14 @@ export function AddLocalFiles({ onBack, onAdd }) {
             <h3 className="mb-1 px-4 font-semibold break-all text-slate-800">
               {selectedFile.name}
             </h3>
-            <p className="mb-6 text-sm text-slate-500">
+            <p className="mb-1 text-sm text-slate-500">
               {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
             </p>
+            <div className="mb-6 flex items-center gap-1.5 rounded-md bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700">
+              <BookOpen className="h-3.5 w-3.5" />
+              ~{estimatePages(selectedFile.size).toLocaleString()} pages will be deducted from your quota
+              This is rough esitmate, actual number may differ.
+            </div>
             <Button
               variant="outline"
               size="sm"

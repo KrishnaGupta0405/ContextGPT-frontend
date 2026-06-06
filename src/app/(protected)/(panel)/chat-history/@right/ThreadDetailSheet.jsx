@@ -29,15 +29,15 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
-  MoreHorizontal,
   Archive,
-  MessageSquareDiff,
   Reply,
   Copy,
 } from "lucide-react";
+import { StickyNote } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import api from "@/lib/axios";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -46,6 +46,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { PlatformBadge } from "@/components/ui/PlatformBadge";
 
 const ThreadDetailSheet = ({
   open,
@@ -57,46 +58,86 @@ const ThreadDetailSheet = ({
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTag, setNewTag] = useState("");
   const [tagLoading, setTagLoading] = useState(false);
+  const [noteText, setNoteText] = useState(threadDetails?.internalNotes || "");
+  const [isSubmittingNote, setIsSubmittingNote] = useState(false);
+
+  useEffect(() => {
+    if (threadDetails?.internalNotes !== undefined) {
+      setNoteText(threadDetails.internalNotes || "");
+    }
+  }, [threadDetails?.internalNotes]);
 
   const handleAddTag = async () => {
     if (!newTag.trim()) {
       setIsAddingTag(false);
       return;
     }
-
     if (newTag.length > 50) {
       toast.error("Tag is too long (max 50 characters)");
       return;
     }
-
     if (threadDetails.tags?.includes(newTag.trim())) {
       toast.error("Tag already exists");
       return;
     }
-
     setTagLoading(true);
     try {
       const currentTags = threadDetails.tags || [];
       const updatedTags = [...currentTags, newTag.trim()];
-
       const response = await api.patch(
-        `/chatting/${threadDetails.chatbotId}/thread/${threadDetails.id}/status`,
-        {
-          tags: updatedTags,
-        },
+        `/chatting/${threadDetails.chatbotId}/thread/update-thread`,
+        [{ threadId: threadDetails.id, tags: updatedTags }],
       );
-
       if (response.data?.success) {
-        toast.success("Tag added successfully");
+        toast.success("Tag added");
         setNewTag("");
         setIsAddingTag(false);
-        if (onUpdate) onUpdate();
+        if (onUpdate) onUpdate({ tags: updatedTags });
       }
     } catch (error) {
       console.error("Failed to add tag:", error);
       toast.error("Failed to add tag");
     } finally {
       setTagLoading(false);
+    }
+  };
+
+  const handleRemoveTag = async (tagToRemove) => {
+    const updatedTags = (threadDetails.tags || []).filter(
+      (t) => t !== tagToRemove,
+    );
+    try {
+      const response = await api.patch(
+        `/chatting/${threadDetails.chatbotId}/thread/update-thread`,
+        [{ threadId: threadDetails.id, tags: updatedTags }],
+      );
+      if (response.data?.success) {
+        toast.success("Tag removed");
+        if (onUpdate) onUpdate({ tags: updatedTags });
+      }
+    } catch (error) {
+      console.error("Failed to remove tag:", error);
+      toast.error("Failed to remove tag");
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!noteText.trim()) return;
+    setIsSubmittingNote(true);
+    try {
+      const response = await api.patch(
+        `/chatting/${threadDetails.chatbotId}/thread/update-thread`,
+        [{ threadId: threadDetails.id, internalNotes: noteText.trim() }],
+      );
+      if (response.data?.success) {
+        toast.success("Note saved");
+        if (onUpdate) onUpdate({ internalNotes: noteText.trim() });
+      }
+    } catch (error) {
+      console.error("Failed to save note:", error);
+      toast.error("Failed to save note");
+    } finally {
+      setIsSubmittingNote(false);
     }
   };
 
@@ -229,7 +270,10 @@ const ThreadDetailSheet = ({
                       <span className="text-[11px] tracking-wide uppercase">
                         {tag}
                       </span>
-                      <X className="h-3 w-3 cursor-pointer opacity-50 transition-colors hover:text-blue-800 hover:opacity-100" />
+                      <X
+                        className="h-3 w-3 cursor-pointer opacity-50 transition-colors hover:text-blue-800 hover:opacity-100"
+                        onClick={() => handleRemoveTag(tag)}
+                      />
                     </Badge>
                   ))}
                   {isAddingTag ? (
@@ -335,6 +379,15 @@ const ThreadDetailSheet = ({
                       )
                     }
                   />
+
+                  {threadDetails.platformSource && (
+                    <DetailRow
+                      label="Platform Source"
+                      value={
+                        <PlatformBadge platform={threadDetails.platformSource} />
+                      }
+                    />
+                  )}
                 </div>
               </section>
 
@@ -430,6 +483,41 @@ const ThreadDetailSheet = ({
                         <Copy className="h-3 w-3" />
                       </Button>
                     </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Internal Note */}
+              <section className="mb-4 space-y-4">
+                <div className="flex items-center gap-1.5">
+                  <StickyNote className="h-4 w-4 text-slate-400" />
+                  <h4 className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                    Internal Note
+                  </h4>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <Textarea
+                    placeholder="Add a private note about this conversation..."
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    className="min-h-[90px] resize-none bg-slate-50/50 text-sm"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      className="bg-blue-600 px-5 font-medium text-white hover:bg-blue-700"
+                      onClick={handleAddNote}
+                      disabled={isSubmittingNote || !noteText.trim()}
+                    >
+                      {isSubmittingNote ? (
+                        <>
+                          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Note"
+                      )}
+                    </Button>
                   </div>
                 </div>
               </section>

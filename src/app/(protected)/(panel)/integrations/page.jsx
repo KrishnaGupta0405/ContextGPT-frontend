@@ -1,132 +1,312 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { PanelNavbar } from "@/components/navbar/PanelNavbar";
-import { ExternalLink, Plus } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useChatbot } from "@/context/ChatbotContext";
+import api from "@/lib/axios";
+import { toast } from "sonner";
+import {
+  ExternalLink,
+  Plus,
+  Loader2,
+  Power,
+  Trash2,
+  Check,
+  Copy,
+  Info,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-const integrations = [
-  {
-    name: "Google Chat",
-    url: "google.com",
-    description:
-      "Connect Google Chat with SiteGPT and chat with your bot directly from Google Chat.",
-    iconColor: "bg-emerald-500",
-    iconContent: (
-      <div className="flex h-full w-full items-center justify-center bg-emerald-500 text-white">
-        <span className="text-lg font-bold">G</span>
-      </div>
-    ),
-  },
-  {
-    name: "Messenger",
-    url: "messenger.com",
-    description:
-      "Connect Messenger with SiteGPT and chat with your bot directly from Messenger.",
-    iconColor: "bg-blue-600",
-    iconContent: (
-      <div className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-blue-600 to-purple-500 text-white">
-        <svg fill="currentColor" viewBox="0 0 24 24" className="h-6 w-6">
-          <path d="M12 2C6.477 2 2 6.145 2 11.258c0 2.91 1.488 5.513 3.82 7.23V22l3.48-1.92c1.23.344 2.535.534 3.88.534 6.242 0 10-4.145 10-9.258C23.18 6.145 18.703 2 12 2Zm1.083 12.336-2.825-3.02-5.503 3.02 6.04-6.425 2.87 3.02 5.46-3.02-6.042 6.425Z" />
-        </svg>
-      </div>
-    ),
-  },
-  {
-    name: "Crisp",
-    url: "crisp.chat",
-    description:
-      "Connect Crisp Chat with SiteGPT and chat with your bot directly from Crisp Chat.",
-    iconColor: "bg-blue-500",
-    iconContent: (
-      <div className="flex h-full w-full items-center justify-center bg-blue-500 text-white">
-        <span className="text-lg font-bold">C</span>
-      </div>
-    ),
-  },
-  {
-    name: "Slack",
-    url: "slack.com",
-    description:
-      "Connect Slack Chat with SiteGPT and chat with your bot directly from Slack.",
-    iconColor: "bg-transparent",
-    iconContent: (
-      <div className="flex h-full w-full items-center justify-center p-1 text-white">
-        <svg viewBox="0 0 24 24" className="h-full w-full">
-          <path
-            fill="#E01E5A"
-            d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z"
-          />
-          <path
-            fill="#E01E5A"
-            d="M6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z"
-          />
-          <path
-            fill="#36C5F0"
-            d="M8.834 5.042a2.528 2.528 0 0 1 2.521-2.52A2.528 2.528 0 0 1 13.876 5.042a2.527 2.527 0 0 1-2.521 2.52H8.834v-2.52z"
-          />
-          <path
-            fill="#36C5F0"
-            d="M8.834 6.313a2.527 2.527 0 0 1 2.521 2.521 2.527 2.527 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z"
-          />
-          <path
-            fill="#2EB67D"
-            d="M18.956 8.835a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.835a2.527 2.527 0 0 1-2.522 2.52h-2.522v-2.52z"
-          />
-          <path
-            fill="#2EB67D"
-            d="M17.685 8.835a2.527 2.527 0 0 1-2.52-2.52 2.527 2.527 0 0 1 2.52-2.521V-0.002A2.528 2.528 0 0 1 20.207 2.52a2.528 2.528 0 0 1-2.522 2.521v6.314z"
-          />
-          <path
-            fill="#ECB22E"
-            d="M15.165 18.958a2.528 2.528 0 0 1-2.521 2.52 2.528 2.528 0 0 1-2.521-2.52a2.527 2.527 0 0 1 2.521-2.52h2.521v2.52z"
-          />
-          <path
-            fill="#ECB22E"
-            d="M15.165 17.687a2.527 2.527 0 0 1-2.521-2.521 2.527 2.527 0 0 1 2.521-2.52h6.313A2.528 2.528 0 0 1 24 15.166a2.528 2.528 0 0 1-2.522-2.52h-6.313z"
-          />
-        </svg>
-      </div>
-    ),
-  },
-  {
-    name: "Freshdesk",
-    url: "freshdesk.com",
-    description:
-      "Connect Freshdesk Chat with SiteGPT and chat with your bot directly from Freshdesk.",
-    iconColor: "bg-green-500",
-    iconContent: (
-      <div className="flex h-full w-full items-center justify-center bg-green-500 text-white">
-        <span className="text-lg font-bold">F</span>
-      </div>
-    ),
-  },
-  {
-    name: "Zendesk",
-    url: "zendesk.com",
-    description:
-      "Connect Zendesk Chat with SiteGPT and chat with your bot directly from Zendesk.",
-    iconColor: "bg-slate-900",
-    iconContent: (
-      <div className="flex h-full w-full items-center justify-center bg-teal-900 text-white">
-        <span className="text-lg font-bold">Z</span>
-      </div>
-    ),
-  },
-  {
-    name: "Zoho SalesIQ",
-    url: "www.zoho.com",
-    description:
-      "Connect Zoho SalesIQ Chat with SiteGPT and chat with your bot directly from Zoho SalesIQ.",
-    iconColor: "bg-red-500",
-    iconContent: (
-      <div className="flex h-full w-full items-center justify-center bg-red-600 text-white">
-        <span className="text-lg font-bold">Z</span>
-      </div>
-    ),
-  },
+import { SlackIntegration } from "./SlackIntegration";
+import { MessengerIntegration } from "./MessengerIntegration";
+import { CrispIntegration } from "./CrispIntegration";
+import { ZendeskIntegration } from "./ZendeskIntegration";
+import { FreshdeskIntegration } from "./FreshdeskIntegration";
+import { GoogleChatIntegration } from "./GoogleChatIntegration";
+import { ZohoSalesIQIntegration } from "./ZohoSalesIQIntegration";
+import { PersonalWebsiteIntegration } from "./PersonalWebsiteIntegration";
+import { ZapierIntegration } from "./ZapierIntegration";
+
+// ─── Platform definitions ────────────────────────────────────────────────────
+const PLATFORMS = [
+  GoogleChatIntegration,
+  MessengerIntegration,
+  SlackIntegration,
+  CrispIntegration,
+  ZendeskIntegration,
+  FreshdeskIntegration,
+  ZapierIntegration,
+  ZohoSalesIQIntegration,
+  PersonalWebsiteIntegration,
 ];
 
+// ─── Main component ──────────────────────────────────────────────────────────
 const IntegrationPage = () => {
+  const { account } = useAuth();
+  const { selectedChatbot } = useChatbot();
+  const searchParams = useSearchParams();
+
+  const [activeIntegrations, setActiveIntegrations] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Modal state
+  const [connectModal, setConnectModal] = useState(null); // platform object or null
+  const [connectModalStep, setConnectModalStep] = useState(1); // 1 = form, 2 = post-connect
+  const [formValues, setFormValues] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Disconnect confirm state
+  const [disconnectTarget, setDisconnectTarget] = useState(null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  // Webhook URL copy
+  const [copiedKey, setCopiedKey] = useState(null);
+
+  // Extra data fetched by a platform's onModalOpen hook
+  const [modalExtraData, setModalExtraData] = useState(null);
+  const [isLoadingExtra, setIsLoadingExtra] = useState(false);
+
+  // Allowed domains state (for PERSONAL_WEBSITE integration)
+  const [domains, setDomains] = useState([]);
+
+  const basePath =
+    account?.id && selectedChatbot?.id
+      ? `/integrations/account/${account.id}/chatbot/${selectedChatbot.id}`
+      : null;
+
+  // ── Fetch integrations ──
+  const fetchIntegrations = useCallback(async () => {
+    if (!basePath) return;
+    setIsLoading(true);
+    try {
+      const res = await api.get(`${basePath}/integrations`);
+      if (res.data.success) {
+        setActiveIntegrations(res.data.data.integrations || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch integrations:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [basePath]);
+
+  useEffect(() => {
+    fetchIntegrations();
+  }, [fetchIntegrations]);
+
+  // ── Handle OAuth redirect back (e.g. ?connected=slack) ──
+  useEffect(() => {
+    const connected = searchParams.get("connected");
+    if (connected) {
+      toast.success(
+        `${connected.charAt(0).toUpperCase() + connected.slice(1)} connected successfully!`,
+      );
+      fetchIntegrations();
+      // Clean the URL
+      window.history.replaceState({}, "", "/integrations");
+    }
+  }, [searchParams, fetchIntegrations]);
+
+  // ── Helpers ──
+  const getActiveIntegration = (platformKey) =>
+    activeIntegrations.find((i) => i.platformType === platformKey);
+
+  // ── Connect: OAuth platforms ──
+  const handleOAuthConnect = async (platform) => {
+    if (!basePath) return;
+    try {
+      const res = await api.get(
+        `${basePath}/oauth/initiate?platformType=${platform.key}`,
+      );
+      if (res.data.success && res.data.data.authUrl) {
+        window.location.href = res.data.data.authUrl;
+      }
+    } catch (err) {
+      toast.error(`Failed to initiate ${platform.name} connection.`);
+    }
+  };
+
+  // ── Connect: Manual platforms ──
+  const openManualModal = async (platform) => {
+    setConnectModal(platform);
+    setConnectModalStep(1);
+    setFormValues({});
+    setModalExtraData(null);
+
+    // Pre-populate domains if reconfiguring PERSONAL_WEBSITE
+    if (platform.usesAllowedDomains) {
+      const active = getActiveIntegration(platform.key);
+      setDomains(active?.allowedDomains || []);
+    } else {
+      setDomains([]);
+    }
+
+    if (platform.onModalOpen && basePath) {
+      setIsLoadingExtra(true);
+      try {
+        const data = await platform.onModalOpen(basePath, api);
+        setModalExtraData(data);
+      } catch {
+        toast.error(`Failed to load ${platform.name} setup info.`);
+      } finally {
+        setIsLoadingExtra(false);
+      }
+    }
+  };
+
+  const handleManualConnect = async () => {
+    if (!basePath || !connectModal) return;
+
+    // Validate: domains for PERSONAL_WEBSITE, fields for others
+    if (connectModal.usesAllowedDomains) {
+      if (domains.length === 0) {
+        toast.error("Please add at least one allowed domain.");
+        return;
+      }
+    } else {
+      const missing = (connectModal.fields || []).filter(
+        (f) => !formValues[f.name]?.trim(),
+      );
+      if (missing.length > 0) {
+        toast.error(`Please fill in: ${missing.map((f) => f.label).join(", ")}`);
+        return;
+      }
+    }
+
+    setIsSaving(true);
+    try {
+      const connectRes = await api.post(`${basePath}/integrations/connect`, {
+        platformType: connectModal.key,
+        config: connectModal.usesAllowedDomains
+          ? {}
+          : {
+              ...formValues,
+              ...(modalExtraData?.setup_token
+                ? { setup_token: modalExtraData.setup_token }
+                : {}),
+            },
+        ...(connectModal.usesAllowedDomains ? { allowedDomains: domains } : {}),
+      });
+      toast.success(`${connectModal.name} connected successfully!`);
+      fetchIntegrations();
+      if (connectModal.twoStep) {
+        // Store integration ID so post-connect content can build per-integration URLs
+        const newId = connectRes.data?.data?.id;
+        console.log("Connect response:", JSON.stringify(connectRes.data), "newId:", newId);
+        setModalExtraData((prev) => ({ ...prev, integrationId: newId, basePath }));
+        setConnectModalStep(2);
+      } else {
+        setConnectModal(null);
+      }
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          `Failed to connect ${connectModal.name}.`,
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ── Toggle enable/disable ──
+  const handleToggle = async (integration, newValue) => {
+    if (!basePath) return;
+    try {
+      await api.patch(`${basePath}/integrations/${integration.id}/toggle`, {
+        isEnabled: newValue,
+      });
+      setActiveIntegrations((prev) =>
+        prev.map((i) =>
+          i.id === integration.id ? { ...i, isEnabled: newValue } : i,
+        ),
+      );
+      toast.success(`Integration ${newValue ? "enabled" : "disabled"}.`);
+    } catch {
+      toast.error("Failed to toggle integration.");
+    }
+  };
+
+  // ── Disconnect ──
+  const handleDisconnect = async () => {
+    if (!basePath || !disconnectTarget) return;
+    setIsDisconnecting(true);
+    try {
+      await api.delete(`${basePath}/integrations/${disconnectTarget.id}`);
+      toast.success("Integration disconnected.");
+      setDisconnectTarget(null);
+      fetchIntegrations();
+    } catch {
+      toast.error("Failed to disconnect integration.");
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  // ── Copy webhook URL ──
+  const webhookBaseUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL
+    ? process.env.NEXT_PUBLIC_BACKEND_API_URL.replace(/\/api\/v1\/?$/, "")
+    : "";
+
+  const copyWebhookUrl = (platformKey) => {
+    const url = `${webhookBaseUrl}/api/webhooks/${platformKey.toLowerCase()}`;
+    navigator.clipboard.writeText(url);
+    setCopiedKey(platformKey);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  // ── Connect: Zapier redirect flow ──
+  const handleZapierConnect = async (platform) => {
+    if (!basePath) return;
+    setConnectModal(platform);
+    setConnectModalStep(1);
+    setModalExtraData(null);
+    setIsLoadingExtra(true);
+    try {
+      const res = await api.post(`${basePath}/zapier/connect`);
+      if (res.data.success) {
+        setModalExtraData(res.data.data);
+        setConnectModalStep(2); // jump straight to post-connect
+      }
+    } catch (err) {
+      toast.error("Failed to connect Zapier. Please try again.");
+      setConnectModal(null);
+    } finally {
+      setIsLoadingExtra(false);
+    }
+  };
+
+  // ── Click handler for "Get Started" / "Connected" button ──
+  const handleCardAction = (platform) => {
+    if (platform.connectionType === "oauth") {
+      handleOAuthConnect(platform);
+    } else if (platform.connectionType === "zapier_redirect") {
+      handleZapierConnect(platform);
+    } else {
+      openManualModal(platform);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col bg-slate-50/50">
       <PanelNavbar
@@ -142,53 +322,342 @@ const IntegrationPage = () => {
             Integrations
           </h1>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {integrations.map((integration) => (
-              <div
-                key={integration.name}
-                className="flex flex-col justify-between overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-              >
-                <div className="p-5 pb-4">
-                  <div className="mb-3 flex items-start gap-4">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] ${
-                        !integration.iconColor.includes("bg-")
-                          ? "border border-slate-200"
-                          : ""
-                      }`}
-                    >
-                      {integration.iconContent}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {PLATFORMS.map((platform) => {
+                const active = getActiveIntegration(platform.key);
+                const isConnected = !!active?.isConnected;
+
+                return (
+                  <div
+                    key={platform.key}
+                    className="flex flex-col justify-between overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+                  >
+                    <div className="p-5 pb-4">
+                      <div className="mb-3 flex items-start justify-between">
+                        <div className="flex items-start gap-4">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-slate-200">
+                            {platform.iconContent}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="text-[15px] font-semibold text-slate-900">
+                                {platform.name}
+                              </h3>
+                              {platform.key === "ZOHO_SALES_IQ" && (
+                                <TooltipProvider delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button className="shrink-0 text-amber-500 hover:text-amber-600">
+                                        <Info className="h-3.5 w-3.5" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      side="top"
+                                      className="max-w-[240px] text-center text-[12px]"
+                                    >
+                                      Agents can only reply to visitors through the Zoho SalesIQ portal. Sending messages from the SiteGPT dashboard is not supported.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
+                            <a
+                              href={`https://${platform.url}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group flex items-center gap-1.5 text-[13px] text-slate-500 hover:text-blue-600"
+                            >
+                              {platform.url}
+                              <ExternalLink className="h-[10px] w-[10px] opacity-70 group-hover:opacity-100" />
+                            </a>
+                          </div>
+                        </div>
+                        {isConnected && (
+                          <Badge
+                            variant="secondary"
+                            className="border-emerald-200 bg-emerald-50 text-emerald-700"
+                          >
+                            Connected
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-[13px] leading-[1.6] text-slate-600">
+                        {platform.description}
+                      </p>
+                      {isConnected && platform.usesAllowedDomains && active?.allowedDomains?.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {active.allowedDomains.map((d) => (
+                            <span
+                              key={d}
+                              className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600"
+                            >
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <h3 className="text-[15px] font-semibold text-slate-900">
-                        {integration.name}
-                      </h3>
-                      <a
-                        href={`https://${integration.url}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group flex items-center gap-1.5 text-[13px] text-slate-500 hover:text-blue-600"
-                      >
-                        {integration.url}
-                        <ExternalLink className="h-[10px] w-[10px] opacity-70 group-hover:opacity-100" />
-                      </a>
+
+                    <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3">
+                      {isConnected ? (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Switch
+                              checked={active.isEnabled}
+                              onCheckedChange={(val) =>
+                                handleToggle(active, val)
+                              }
+                            />
+                            <span className="text-[13px] text-slate-500">
+                              {active.isEnabled ? "Active" : "Paused"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {platform.connectionType === "manual" &&
+                              platform.key !== "SLACK" && (
+                                <button
+                                  onClick={() => copyWebhookUrl(platform.key)}
+                                  className="flex items-center gap-1 rounded px-2 py-1 text-[12px] text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                  title="Copy webhook URL"
+                                >
+                                  {copiedKey === platform.key ? (
+                                    <Check className="h-3 w-3 text-emerald-500" />
+                                  ) : (
+                                    <Copy className="h-3 w-3" />
+                                  )}
+                                  Webhook
+                                </button>
+                              )}
+                            <button
+                              onClick={() => openManualModal(platform)}
+                              className="text-[13px] font-medium text-blue-600 hover:text-blue-700"
+                            >
+                              Reconfigure
+                            </button>
+                            <button
+                              onClick={() => setDisconnectTarget(active)}
+                              className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500"
+                              title="Disconnect"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : platform.key === "ZAPIER" ? (
+                        <span className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-400">
+                          Coming Soon
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleCardAction(platform)}
+                          className="flex items-center gap-1.5 text-[13px] font-semibold text-blue-600 hover:text-blue-700"
+                        >
+                          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />{" "}
+                          {platform.connectionType === "oauth"
+                            ? `Connect ${platform.name}`
+                            : "Get Started"}
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <p className="text-[13px] leading-[1.6] text-slate-600">
-                    {integration.description}
-                  </p>
-                </div>
-                <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3">
-                  <button className="flex items-center gap-1.5 text-[13px] font-semibold text-blue-600 hover:text-blue-700">
-                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} /> Get
-                    Started
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── Manual Connect / Reconfigure Modal ── */}
+      <Dialog
+        open={!!connectModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConnectModal(null);
+            setConnectModalStep(1);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {connectModalStep === 2
+                ? `${connectModal?.name} Connected`
+                : (connectModal?.modalTitle ??
+                  (connectModal?.name
+                    ? `Connect ${connectModal.name}`
+                    : "Connect Integration"))}
+            </DialogTitle>
+            <DialogDescription>
+              {connectModalStep === 2
+                ? `Complete the setup by configuring your ${connectModal?.name} integration.`
+                : (connectModal?.modalDescription ??
+                  `Enter your ${connectModal?.name} API credentials below.`)}
+            </DialogDescription>
+          </DialogHeader>
+
+          {connectModalStep === 2 ? (
+            /* ── Step 2: post-connect content (e.g. updated Slack manifest) ── */
+            <div className="flex flex-col gap-4 py-2">
+              {connectModal?.renderPostConnectContent?.(modalExtraData, {
+                copiedKey,
+                setCopiedKey,
+              })}
+            </div>
+          ) : connectModal?.connectionType === "oauth" ? (
+            <div className="flex flex-col gap-4 py-2">
+              <p className="text-sm text-slate-600">
+                You will be redirected to {connectModal.name} to authorize
+                ContextGPT. After approval, you&apos;ll be redirected back here.
+              </p>
+              <Button onClick={() => handleOAuthConnect(connectModal)}>
+                <Power className="mr-2 h-4 w-4" />
+                Authorize {connectModal.name}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 py-2">
+              {/* Platform-specific extra content (e.g. Messenger setup info, Slack manifest) */}
+              {connectModal?.renderExtraModalContent?.(modalExtraData, {
+                isLoadingExtra,
+                copiedKey,
+                setCopiedKey,
+                domains,
+                setDomains,
+              })}
+
+              {(connectModal?.fields || []).map((field) => (
+                <div key={field.name} className="flex flex-col gap-1.5">
+                  <Label htmlFor={field.name} className="text-[13px]">
+                    {field.label} <span className="text-red-500">*</span>
+                  </Label>
+                  {field.type === "textarea" ? (
+                    <textarea
+                      id={field.name}
+                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-[13px] ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                      placeholder={field.placeholder}
+                      value={formValues[field.name] || ""}
+                      onChange={(e) =>
+                        setFormValues((prev) => ({
+                          ...prev,
+                          [field.name]: e.target.value,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <Input
+                      id={field.name}
+                      type={
+                        field.name.includes("key") ||
+                        field.name.includes("token") ||
+                        field.name.includes("secret")
+                          ? "password"
+                          : "text"
+                      }
+                      placeholder={field.placeholder}
+                      value={formValues[field.name] || ""}
+                      onChange={(e) =>
+                        setFormValues((prev) => ({
+                          ...prev,
+                          [field.name]: e.target.value,
+                        }))
+                      }
+                    />
+                  )}
+                </div>
+              ))}
+
+              {/* Show webhook URL for platforms that need it (not Messenger, Slack, or Crisp — Slack shows it via manifest, Crisp shows it in step 2) */}
+              {connectModal &&
+                !["MESSENGER", "SLACK", "CRISP", "ZENDESK", "ZOHO_SALES_IQ", "FRESHDESK"].includes(connectModal.key) &&
+                webhookBaseUrl && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="mb-1.5 text-[12px] font-medium text-slate-700">
+                      Webhook URL (paste this in your {connectModal.name}{" "}
+                      settings)
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 truncate rounded border border-slate-200 bg-white px-2 py-1 text-[12px] text-slate-600">
+                        {`${webhookBaseUrl}/api/webhooks/${connectModal.key.toLowerCase()}`}
+                      </code>
+                      <button
+                        onClick={() => copyWebhookUrl(connectModal.key)}
+                        className="shrink-0 rounded p-1 hover:bg-slate-200"
+                      >
+                        {copiedKey === connectModal.key ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5 text-slate-500" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+            </div>
+          )}
+
+          <DialogFooter>
+            {connectModalStep === 2 ? (
+              <Button
+                onClick={() => {
+                  setConnectModal(null);
+                  setConnectModalStep(1);
+                  fetchIntegrations();
+                }}
+              >
+                Done
+              </Button>
+            ) : connectModal?.connectionType === "manual" ? (
+              <>
+                <DialogClose asChild>
+                  <Button variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button onClick={handleManualConnect} disabled={isSaving}>
+                  {isSaving && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {connectModal?.connectButtonLabel || "Connect"}
+                </Button>
+              </>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Disconnect Confirmation Dialog ── */}
+      <Dialog
+        open={!!disconnectTarget}
+        onOpenChange={(open) => !open && setDisconnectTarget(null)}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Disconnect Integration</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to disconnect this integration? The bot will
+              stop responding on this platform.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={handleDisconnect}
+              disabled={isDisconnecting}
+            >
+              {isDisconnecting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Disconnect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

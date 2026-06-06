@@ -8,7 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CheckCircle2, X, Star, Trash2 } from "lucide-react";
+import { CheckCircle2, X, Star, Trash2, Archive, ArchiveRestore } from "lucide-react";
 
 const BottomBar = ({
   selectedCount,
@@ -16,6 +16,8 @@ const BottomBar = ({
   onUnresolve,
   onImportant,
   onUnimportant,
+  onArchive,
+  onUnarchive,
   onDelete,
   onClearSelection,
   updating,
@@ -97,6 +99,38 @@ const BottomBar = ({
         <TooltipContent>Remove important flag</TooltipContent>
       </Tooltip>
 
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onArchive}
+            disabled={updating}
+            className="h-8 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-700"
+          >
+            <Archive className="mr-1.5 h-4 w-4" />
+            Archive
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Archive selected threads</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onUnarchive}
+            disabled={updating}
+            className="h-8"
+          >
+            <ArchiveRestore className="mr-1.5 h-4 w-4" />
+            Unarchive
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Unarchive selected threads</TooltipContent>
+      </Tooltip>
+
       <Separator orientation="vertical" className="h-6" />
 
       <Tooltip>
@@ -105,8 +139,9 @@ const BottomBar = ({
             variant="ghost"
             size="sm"
             onClick={onDelete}
-            disabled={updating}
-            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8"
+            // disabled={updating}
+            disabled={true}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 hover:[cursor:not-allowed]"
           >
             <Trash2 className="mr-1.5 h-4 w-4" />
             Delete

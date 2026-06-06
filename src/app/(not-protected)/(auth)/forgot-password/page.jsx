@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { CustomBreadcrumb } from "@/components/ui/CustomBreadcrumb";
 import { toast } from "sonner";
 import LoadingIndicator from "@/components/ui/LoadingIndicator";
+import api from "@/lib/axios";
 
 const forgotPasswordSchema = z.object({
   email: z
@@ -43,15 +44,20 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data) => {
     loadingBarRef.current.continuousStart();
     const toastId = toast.loading("Processing your request...");
-
-    // Simulate a delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    toast.info("Backend route not yet configured", {
-      id: toastId,
-    });
-    loadingBarRef.current.complete();
-    console.log("Forgot password requested for:", data.email);
+    try {
+      await api.post("/auth/forgot-password", { email: data.email });
+      toast.success(
+        "If that email is registered, a password reset link has been sent.",
+        { id: toastId }
+      );
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || "Something went wrong. Please try again.",
+        { id: toastId }
+      );
+    } finally {
+      loadingBarRef.current.complete();
+    }
   };
 
   return (

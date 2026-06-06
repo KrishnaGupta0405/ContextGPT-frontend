@@ -29,9 +29,18 @@ export const ChatbotProvider = ({ children }) => {
     }
   };
 
+  const updateChatbotRole = (newRole) => {
+    setSelectedChatbot((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, userRole: newRole };
+      localStorage.setItem("selectedChatbot", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   return (
     <ChatbotContext.Provider
-      value={{ selectedChatbot, selectChatbot, loading }}
+      value={{ selectedChatbot, selectChatbot, updateChatbotRole, loading }}
     >
       {children}
     </ChatbotContext.Provider>

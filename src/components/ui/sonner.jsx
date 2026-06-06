@@ -30,25 +30,25 @@ const Toaster = ({ ...props }) => {
         "--normal-border": "var(--border)",
         "--border-radius": "var(--radius)",
 
-        // Emerald green success (matches Tailwind emerald-500 vibe)
-        "--success-bg": "oklch(0.696 0.149 162.5)",
-        "--success-text": "oklch(0.25 0.06 162)",
-        "--success-border": "oklch(0.60 0.13 162)",
+        // Success – soft green
+        "--success-bg": "#ecfdf5",
+        "--success-text": "#065f46",
+        "--success-border": "#a7f3d0",
 
-        // Info – blue-ish
-        "--info-bg": "oklch(0.95 0.04 240)",
-        "--info-text": "oklch(0.30 0.08 240)",
-        "--info-border": "oklch(0.85 0.06 240)",
+        // Info – soft blue
+        "--info-bg": "#eff6ff",
+        "--info-text": "#1e40af",
+        "--info-border": "#bfdbfe",
 
-        // Warning – amber/orange
-        "--warning-bg": "oklch(0.95 0.08 80)",
-        "--warning-text": "oklch(0.35 0.10 80)",
-        "--warning-border": "oklch(0.88 0.07 80)",
+        // Warning – soft amber
+        "--warning-bg": "#fffbeb",
+        "--warning-text": "#92400e",
+        "--warning-border": "#fde68a",
 
-        // Error – red
-        "--error-bg": "oklch(0.95 0.06 25)",
-        "--error-text": "oklch(0.30 0.09 25)",
-        "--error-border": "oklch(0.85 0.05 25)",
+        // Error – soft red
+        "--error-bg": "#fef2f2",
+        "--error-text": "#991b1b",
+        "--error-border": "#fecaca",
       }}
       closeButton={true}
       {...props}

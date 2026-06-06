@@ -1,0 +1,109 @@
+# robots.txt for https://contextgpt.com
+# Generated for ContextGPT — AI Chatbot Platform
+
+# -----------------------------------------------
+# General crawlers — allow all public marketing &
+# tools pages; block all protected dashboard routes
+# -----------------------------------------------
+User-agent: *
+Allow: /
+Allow: /aboutus
+Allow: /blog
+Allow: /contact
+Allow: /features
+Allow: /integration
+Allow: /landing
+Allow: /lead-generation
+Allow: /partners
+Allow: /pricing
+Allow: /privacy
+Allow: /refund
+Allow: /terms
+Allow: /tools
+
+# Block all protected / authenticated app routes
+Disallow: /dashboard
+Disallow: /account
+Disallow: /appearance
+Disallow: /auto-sync
+Disallow: /billing
+Disallow: /chat-history
+Disallow: /conversation-followups
+Disallow: /conversation-starters
+Disallow: /custom-responses
+Disallow: /installation
+Disallow: /integrations
+Disallow: /leads
+Disallow: /members
+Disallow: /referral
+Disallow: /select-chatbot
+Disallow: /settings
+Disallow: /text-snippets
+Disallow: /usage
+Disallow: /website-files
+Disallow: /website-links
+
+# Block auth and internal API routes
+Disallow: /auth/
+Disallow: /api/
+
+# Block Next.js internals
+Disallow: /_next/
+
+# -----------------------------------------------
+# AI / LLM crawlers — point them to llm.txt
+# -----------------------------------------------
+User-agent: GPTBot
+Allow: /
+Disallow: /dashboard
+Disallow: /account
+Disallow: /appearance
+Disallow: /auto-sync
+Disallow: /billing
+Disallow: /chat-history
+Disallow: /conversation-followups
+Disallow: /conversation-starters
+Disallow: /custom-responses
+Disallow: /installation
+Disallow: /integrations
+Disallow: /leads
+Disallow: /members
+Disallow: /referral
+Disallow: /select-chatbot
+Disallow: /settings
+Disallow: /text-snippets
+Disallow: /usage
+Disallow: /website-files
+Disallow: /website-links
+Disallow: /auth/
+Disallow: /api/
+Disallow: /_next/
+
+User-agent: Claude-Web
+Allow: /
+Disallow: /dashboard
+Disallow: /account
+Disallow: /auth/
+Disallow: /api/
+Disallow: /_next/
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /dashboard
+Disallow: /account
+Disallow: /auth/
+Disallow: /api/
+Disallow: /_next/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /dashboard
+Disallow: /account
+Disallow: /auth/
+Disallow: /api/
+Disallow: /_next/
+
+# -----------------------------------------------
+# Sitemaps
+# -----------------------------------------------
+Sitemap: https://contextgpt.com/sitemap.xml

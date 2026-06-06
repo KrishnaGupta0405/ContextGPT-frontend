@@ -16,30 +16,38 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Receipt, ExternalLink, FileText } from "lucide-react";
+import { Receipt, ExternalLink, FileText, ChevronLeft, ChevronRight, Download } from "lucide-react";
+
+const PAGE_SIZE = 10;
 
 export function TransactionHistory() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0); // 0-indexed
+
+  const fetchTransactions = async (pageNum = 0) => {
+    try {
+      setLoading(true);
+      const txnResponse = await api.get(
+        `/billing/transactions?limit=${PAGE_SIZE}&offset=${pageNum * PAGE_SIZE}`
+      );
+      console.log(txnResponse);
+      if (txnResponse?.data?.success) {
+        setTransactions(txnResponse.data.data.transactions || []);
+        setTotalCount(txnResponse.data.data.total || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      toast.error("Failed to load billing history");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        setLoading(true);
-        const txnResponse = await api.get("/billing/transactions");
-        if (txnResponse?.data?.success) {
-          setTransactions(txnResponse.data.data.transactions || []);
-        }
-      } catch (error) {
-        console.error("Error fetching transactions:", error);
-        toast.error("Failed to load billing history");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTransactions();
-  }, []);
+    fetchTransactions(page);
+  }, [page]);
 
   const formatDate = (dateString, formatStr = "MMM dd, yyyy") => {
     if (!dateString) return "N/A";
@@ -118,6 +126,23 @@ export function TransactionHistory() {
     }
   };
 
+  // F5: Fetch fresh invoice URL from backend proxy
+  const handleInvoiceDownload = async (txnId) => {
+    try {
+      const res = await api.get(`/billing/invoices/${txnId}`);
+      const url = res.data?.data?.invoiceUrl;
+      if (url) {
+        window.open(url, "_blank");
+      } else {
+        toast.error("Invoice not available");
+      }
+    } catch {
+      toast.error("Failed to fetch invoice");
+    }
+  };
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
   return (
     <Card className="border shadow-sm">
       <CardHeader className="border-b pb-4">
@@ -161,103 +186,137 @@ export function TransactionHistory() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-6">Date</TableHead>
-                  <TableHead>Plan Details</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="pr-6 text-right">Receipt</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map((txn) => (
-                  <TableRow
-                    key={txn.id}
-                    className="group hover:bg-muted/30 transition-colors"
-                  >
-                    <TableCell className="pl-6 font-medium whitespace-nowrap">
-                      {formatDate(txn.createdAt)}
-                      <div className="text-muted-foreground mt-1 flex items-center gap-1 text-xs font-normal">
-                        <span>
-                          {formatDate(txn.billingPeriodStart, "MMM dd")} -{" "}
-                          {formatDate(txn.billingPeriodEnd, "MMM dd, yyyy")}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col items-start">
-                        <span className="flex items-center gap-2 text-sm font-medium capitalize">
-                          {getPlanName(txn.type)}
-                          {txn.subscription?.isTrial && (
-                            <Badge
-                              variant="outline"
-                              className="h-4 border-blue-200 bg-blue-50/50 px-1.5 py-0 text-[10px] text-blue-600 dark:border-blue-800 dark:text-blue-400"
-                            >
-                              Trial
-                            </Badge>
-                          )}
-                        </span>
-                        <span className="text-muted-foreground mt-0.5 text-xs capitalize">
-                          {txn.billingInterval ||
-                            txn.subscription?.billingInterval}{" "}
-                          billing
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-base font-semibold">
-                      {formatCurrency(txn.amount, txn.currency)}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(txn.status, txn.subscription?.isTrial)}
-                    </TableCell>
-                    <TableCell className="pr-6 text-right">
-                      <div className="text-muted-foreground flex justify-end gap-2">
-                        {txn.receiptUrl && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            asChild
-                            className="hover:text-primary h-8 gap-1.5"
-                          >
-                            <a
-                              href={txn.receiptUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <FileText className="h-4 w-4" />
-                              <span className="hidden sm:inline">Receipt</span>
-                            </a>
-                          </Button>
-                        )}
-                        {txn.invoiceUrl && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            asChild
-                            className="hover:text-primary h-8 gap-1"
-                          >
-                            <a
-                              href={txn.invoiceUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </Button>
-                        )}
-                        {!txn.receiptUrl && !txn.invoiceUrl && (
-                          <span className="px-2 py-1 text-xs italic">N/A</span>
-                        )}
-                      </div>
-                    </TableCell>
+          <>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="pl-6">Date</TableHead>
+                    <TableHead>Plan Details</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="pr-6 text-right">Invoice</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {transactions.map((txn) => (
+                    <TableRow
+                      key={txn.id}
+                      className="group hover:bg-muted/30 transition-colors"
+                    >
+                      <TableCell className="pl-6 font-medium whitespace-nowrap">
+                        {formatDate(txn.createdAt)}
+                        <div className="text-muted-foreground mt-1 flex items-center gap-1 text-xs font-normal">
+                          <span>
+                            {formatDate(txn.billingPeriodStart, "MMM dd")} -{" "}
+                            {formatDate(txn.billingPeriodEnd, "MMM dd, yyyy")}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col items-start">
+                          <span className="flex items-center gap-2 text-sm font-medium capitalize">
+                            {getPlanName(txn.type)}
+                            {txn.subscription?.isTrial && (
+                              <Badge
+                                variant="outline"
+                                className="h-4 border-blue-200 bg-blue-50/50 px-1.5 py-0 text-[10px] text-blue-600 dark:border-blue-800 dark:text-blue-400"
+                              >
+                                Trial
+                              </Badge>
+                            )}
+                          </span>
+                          <span className="text-muted-foreground mt-0.5 text-xs capitalize">
+                            {txn.billingInterval ||
+                              txn.subscription?.billingInterval}{" "}
+                            billing
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-base font-semibold">
+                        {formatCurrency(txn.amount, txn.currency)}
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(txn.status, txn.subscription?.isTrial)}
+                      </TableCell>
+                      <TableCell className="pr-6 text-right">
+                        <div className="text-muted-foreground flex justify-end gap-2">
+                          {/* {txn.receiptUrl && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              asChild
+                              className="hover:text-primary h-8 gap-1.5"
+                            >
+                              <a
+                                href={txn.receiptUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <FileText className="h-4 w-4" />
+                                <span className="hidden sm:inline">
+                                  Receipt
+                                </span>
+                              </a>
+                            </Button>
+                          )} */}
+                          {/* F5: Use backend proxy for invoice URL */}
+                          {txn.paddleTransactionId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="hover:text-primary h-8 gap-1"
+                              onClick={() => handleInvoiceDownload(txn.id)}
+                            >
+                              <Download className="h-4 w-4" />
+                              <span className="hidden sm:inline">
+                                Invoice
+                              </span>
+                            </Button>
+                          )}
+                          {!txn.receiptUrl &&
+                            !txn.paddleTransactionId && (
+                              <span className="px-2 py-1 text-xs italic">
+                                N/A
+                              </span>
+                            )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* F7: Pagination controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t px-6 py-3">
+                <span className="text-muted-foreground text-sm">
+                  Showing {page * PAGE_SIZE + 1}–
+                  {Math.min((page + 1) * PAGE_SIZE, totalCount)} of{" "}
+                  {totalCount}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages - 1}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

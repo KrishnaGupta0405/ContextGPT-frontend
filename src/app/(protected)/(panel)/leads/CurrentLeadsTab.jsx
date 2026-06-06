@@ -734,6 +734,7 @@ const CurrentLeadsTab = () => {
           hasMoreThreads={threadPagination.hasMore}
           onLoadMoreThreads={handleLoadMoreThreads}
           onUpdateVisitor={handleUpdateVisitor}
+          chatbotId={selectedChatbot?.id || selectedChatbot?.chatbotId}
         />
       </div>
     </TooltipProvider>

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import { PlayCircle, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/axios";
@@ -32,6 +33,7 @@ const StarIcon = ({ className }) => (
 const ConversationFollowups = () => {
   const { account } = useAuth();
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
 
   const [followups, setFollowups] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +51,10 @@ const ConversationFollowups = () => {
       fetchFollowups();
     }
   }, [account?.id, selectedChatbot?.id]);
+
+  useEffect(() => {
+    return () => markClean();
+  }, []);
 
   const fetchFollowups = async () => {
     setIsLoading(true);
@@ -73,6 +79,7 @@ const ConversationFollowups = () => {
     setButtonLabel("");
     setMessageText("");
     setLinkUrl("");
+    markClean();
   };
 
   const handleEdit = (followup) => {
@@ -159,8 +166,6 @@ const ConversationFollowups = () => {
       let response;
       if (editingId) {
         // Update
-        // Note: The API spec says `esclate` is false by default on patch,
-        // but since we are sending it in the payload, it should respect it.
         response = await api.patch(
           `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/follow-up-prompts/${editingId}`,
           payload,
@@ -190,6 +195,42 @@ const ConversationFollowups = () => {
       toast.error("An error occurred while saving.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleMoveUp = async (index) => {
+    if (index === 0) return;
+    const newFollowups = [...followups];
+    [newFollowups[index - 1], newFollowups[index]] = [newFollowups[index], newFollowups[index - 1]];
+    setFollowups(newFollowups);
+    try {
+      await api.patch(
+        `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/follow-up-prompts/reorder`,
+        { orderedIds: newFollowups.map((f) => f.id) },
+      );
+      toast.success("Order updated successfully.");
+    } catch (error) {
+      console.error("Failed to reorder:", error);
+      toast.error("Failed to reorder follow-up prompts.");
+      fetchFollowups();
+    }
+  };
+
+  const handleMoveDown = async (index) => {
+    if (index === followups.length - 1) return;
+    const newFollowups = [...followups];
+    [newFollowups[index], newFollowups[index + 1]] = [newFollowups[index + 1], newFollowups[index]];
+    setFollowups(newFollowups);
+    try {
+      await api.patch(
+        `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/follow-up-prompts/reorder`,
+        { orderedIds: newFollowups.map((f) => f.id) },
+      );
+      toast.success("Order updated successfully.");
+    } catch (error) {
+      console.error("Failed to reorder:", error);
+      toast.error("Failed to reorder follow-up prompts.");
+      fetchFollowups();
     }
   };
 
@@ -228,7 +269,7 @@ const ConversationFollowups = () => {
                 No conversation followups found.
               </div>
             ) : (
-              followups.map((followup) => (
+              followups.map((followup, index) => (
                 <div
                   key={followup.id}
                   className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
@@ -236,8 +277,24 @@ const ConversationFollowups = () => {
                   <div className="mb-3 flex items-start justify-between">
                     <div className="flex items-center gap-4">
                       <div className="flex flex-col gap-0 text-slate-300">
-                        <ChevronUp className="h-4 w-4 cursor-pointer hover:text-slate-500" />
-                        <ChevronDown className="h-4 w-4 translate-y-[-4px] transform cursor-pointer hover:text-slate-500" />
+                        <ChevronUp
+                          className={cn(
+                            "h-4 w-4",
+                            index === 0
+                              ? "cursor-not-allowed text-slate-200"
+                              : "cursor-pointer hover:text-slate-500",
+                          )}
+                          onClick={() => handleMoveUp(index)}
+                        />
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 translate-y-[-4px] transform",
+                            index === followups.length - 1
+                              ? "cursor-not-allowed text-slate-200"
+                              : "cursor-pointer hover:text-slate-500",
+                          )}
+                          onClick={() => handleMoveDown(index)}
+                        />
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -297,7 +354,7 @@ const ConversationFollowups = () => {
                 </Label>
                 <Tabs
                   value={actionType}
-                  onValueChange={setActionType}
+                  onValueChange={(v) => { setActionType(v); markDirty(); }}
                   className="w-full"
                 >
                   <TabsList className="grid w-full grid-cols-3 bg-slate-100 p-1">
@@ -318,7 +375,6 @@ const ConversationFollowups = () => {
                       className="relative rounded-md text-[13px] font-medium text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
                     >
                       Escalate
-                      {/* Optional: Add a subtle badge or styling to 'Escalate' if desired */}
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -336,7 +392,7 @@ const ConversationFollowups = () => {
                   }
                   className="h-10 rounded-lg border-slate-200"
                   value={buttonLabel}
-                  onChange={(e) => setButtonLabel(e.target.value)}
+                  onChange={(e) => { setButtonLabel(e.target.value); markDirty(); }}
                 />
               </div>
 
@@ -353,11 +409,11 @@ const ConversationFollowups = () => {
                       placeholder={
                         actionType === "escalate"
                           ? "We have escalated the conversation to human support. Please share any additional details you want to include in the support request."
-                          : "e.g. What is the pricing of SiteGPT?"
+                          : "e.g. What is the pricing of contextGPT?"
                       }
                       className="min-h-[120px] w-full resize-none rounded-lg border border-slate-200 p-3 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
                       value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
+                      onChange={(e) => { setMessageText(e.target.value); markDirty(); }}
                     />
                   </>
                 ) : (
@@ -369,7 +425,7 @@ const ConversationFollowups = () => {
                       placeholder="https://example.com/contact"
                       className="h-10 rounded-lg border-slate-200"
                       value={linkUrl}
-                      onChange={(e) => setLinkUrl(e.target.value)}
+                      onChange={(e) => { setLinkUrl(e.target.value); markDirty(); }}
                     />
                   </>
                 )}

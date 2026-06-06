@@ -113,6 +113,8 @@ This skill encapsulates the "Pro SaaS" aesthetic guidelines and tokens.
 
 ### Tech-stack used
 
+the backend dashboard is made using nodejs and expressjs and paddle for payments and drizzle for database, paddlev3 is used
+
 this is nextjs project, with shadcn with js and jsx only, don't make use of typescript
 use the color varilables already declared in the global.css
 

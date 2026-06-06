@@ -16,4 +16,5 @@ export const ROUTES = {
   Leads: "/leads",
   "Text Snippets": "/text-snippets",
   "Website Links": "/website-links",
+  Tools: "/tools",
 };

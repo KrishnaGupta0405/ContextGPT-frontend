@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import api from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import {
@@ -157,6 +158,7 @@ const InstructionCard = ({
 
 const InstructionsTab = () => {
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
   const [instructions, setInstructions] = useState([]);
   const [selectedInstructionId, setSelectedInstructionId] =
     useState("default-none");
@@ -179,6 +181,19 @@ const InstructionsTab = () => {
       fetchInstructions();
     }
   }, [selectedChatbot]);
+
+  useEffect(() => {
+    return () => markClean();
+  }, [markClean]);
+
+  // Sync react-hook-form dirty state → context (Pattern B)
+  useEffect(() => {
+    if (form.formState.isDirty) {
+      markDirty();
+    } else {
+      markClean();
+    }
+  }, [form.formState.isDirty, markDirty, markClean]);
 
   const fetchInstructions = async (selectId = null) => {
     setInitialLoading(true);
@@ -248,6 +263,7 @@ const InstructionsTab = () => {
   const cancelEditing = () => {
     setIsEditingCustom(false);
     setEditingInstructionId(null);
+    form.reset(defaultValues);
   };
 
   const onSubmitCustom = async (values) => {
@@ -368,6 +384,7 @@ const InstructionsTab = () => {
         toast.success(
           response.data.message || "Active instruction selection saved!",
         );
+        markClean();
       }
     } catch (error) {
       toast.error(
@@ -408,7 +425,7 @@ const InstructionsTab = () => {
                 "No specific base instructions applied. The chatbot will purely rely on standard behaviors and base prompts.",
             }}
             isSelected={selectedInstructionId === "default-none"}
-            onSelect={(p) => setSelectedInstructionId(p.id)}
+            onSelect={(p) => { setSelectedInstructionId(p.id); markDirty(); }}
             isExpanded={expandedCardId === "default-none"}
             onToggleExpand={() =>
               setExpandedCardId(
@@ -438,7 +455,7 @@ const InstructionsTab = () => {
                 key={instruction.id}
                 instruction={instruction}
                 isSelected={selectedInstructionId === instruction.id}
-                onSelect={(p) => setSelectedInstructionId(p.id)}
+                onSelect={(p) => { setSelectedInstructionId(p.id); markDirty(); }}
                 isExpanded={expandedCardId === instruction.id}
                 onToggleExpand={() =>
                   setExpandedCardId(

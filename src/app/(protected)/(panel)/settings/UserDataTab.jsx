@@ -2,11 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Sparkles, Check, Loader2 } from "lucide-react";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import api from "@/lib/axios";
 import { toast } from "sonner";
 
 const UserDataTab = () => {
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
   const [showBanner, setShowBanner] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -19,6 +21,7 @@ const UserDataTab = () => {
 
   const toggleDataType = (key) => {
     setDataTypes((prev) => ({ ...prev, [key]: !prev[key] }));
+    markDirty();
   };
 
   useEffect(() => {
@@ -26,6 +29,10 @@ const UserDataTab = () => {
       fetchLeadSettings();
     }
   }, [selectedChatbot]);
+
+  useEffect(() => {
+    return () => markClean();
+  }, [markClean]);
 
   const fetchLeadSettings = async () => {
     setInitialLoading(true);
@@ -36,18 +43,13 @@ const UserDataTab = () => {
       if (!accountId) throw new Error("Account ID missing");
 
       const response = await api.get(
-        `/chatbots/account/${accountId}/chatbot/${chatbotId}/lead-settings`,
+        `/chatbots/account/${accountId}/chatbot/${chatbotId}/user-data-settings`,
       );
 
       if (response.data.success) {
         const data = response.data.data;
         if (data) {
-          if (!data.enableLeadCollection) {
-            setCollectMode("do_not_collect");
-          } else {
-            setCollectMode(data.whenUserShareDetails || "optional");
-          }
-
+          setCollectMode(data.whenUserShareDetails || "do_not_collect");
           setDataTypes({
             name: data.customerNameTake ?? true,
             emailAddress: data.customerEmailTake ?? true,
@@ -56,7 +58,7 @@ const UserDataTab = () => {
         }
       }
     } catch (error) {
-      console.error("Failed to fetch lead settings", error);
+      console.error("Failed to fetch user data settings", error);
       toast.error("Failed to load user data settings");
     } finally {
       setInitialLoading(false);
@@ -75,17 +77,17 @@ const UserDataTab = () => {
         customerNameTake: dataTypes.name,
         customerEmailTake: dataTypes.emailAddress,
         customerPhoneTake: dataTypes.phoneNumber,
-        whenUserShareDetails:
-          collectMode === "do_not_collect" ? "optional" : collectMode,
+        whenUserShareDetails: collectMode,
       };
 
       const response = await api.patch(
-        `/chatbots/account/${accountId}/chatbot/${chatbotId}/lead-settings`,
+        `/chatbots/account/${accountId}/chatbot/${chatbotId}/user-data-settings`,
         payload,
       );
 
       if (response.data.success) {
         toast.success(response.data.message || "User data settings saved!");
+        markClean();
       }
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to save settings");
@@ -151,7 +153,7 @@ const UserDataTab = () => {
           {/* Mandatory */}
           <label
             className="flex cursor-pointer items-start gap-3"
-            onClick={() => setCollectMode("mandatory")}
+            onClick={() => { setCollectMode("mandatory"); markDirty(); }}
           >
             <div className="mt-0.5 flex items-center justify-center">
               <div
@@ -180,7 +182,7 @@ const UserDataTab = () => {
           {/* Optional */}
           <label
             className="flex cursor-pointer items-start gap-3"
-            onClick={() => setCollectMode("optional")}
+            onClick={() => { setCollectMode("optional"); markDirty(); }}
           >
             <div className="mt-0.5 flex items-center justify-center">
               <div
@@ -209,7 +211,7 @@ const UserDataTab = () => {
           {/* Do Not Collect */}
           <label
             className="flex cursor-pointer items-start gap-3"
-            onClick={() => setCollectMode("do_not_collect")}
+            onClick={() => { setCollectMode("do_not_collect"); markDirty(); }}
           >
             <div className="mt-0.5 flex items-center justify-center">
               <div

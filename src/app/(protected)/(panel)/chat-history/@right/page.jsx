@@ -4,42 +4,14 @@ import React, { useEffect, useState, useRef } from "react";
 import { useChatbot } from "@/context/ChatbotContext";
 import { useSearchParams } from "next/navigation";
 import api from "@/lib/axios";
+import { useChattingSocket } from "@/context/ChattingSocketContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import {
-  Send,
-  User,
-  Bot,
-  Info,
-  Tag,
-  Star,
-  CheckCircle,
-  Download,
-  MoreHorizontal,
-  Copy,
-  Trash2,
-  ExternalLink,
-  MailOpen,
-  Loader2,
-} from "lucide-react";
+import { Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThreadDetailSheet from "./ThreadDetailSheet";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -48,11 +20,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Pencil, X, Check } from "lucide-react";
 import MessageItem from "./MessageItem";
+import ChatHeader from "./ChatHeader";
 
 const ChatHistoryRight = () => {
   const { selectedChatbot } = useChatbot();
+  const { isConnected, send, addListener } = useChattingSocket() || {};
   const searchParams = useSearchParams();
   const threadId = searchParams.get("threadId");
   const [messages, setMessages] = useState([]);
@@ -62,12 +35,9 @@ const ChatHistoryRight = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [threadDetails, setThreadDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [editingMessage, setEditingMessage] = useState(null); // { id, content }
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTitle, setEditedTitle] = useState("");
   const scrollRef = useRef(null);
 
   const fetchMessages = React.useCallback(async () => {
@@ -115,11 +85,7 @@ const ChatHistoryRight = () => {
       if (response.data?.success) {
         const detail = response.data.data.thread;
         // Merge: prefer detail API data but keep icon fields from list if missing
-        setThreadDetails((prev) => {
-          const newDetails = { ...prev, ...detail };
-          setEditedTitle(newDetails.title || "Visitor");
-          return newDetails;
-        });
+        setThreadDetails((prev) => ({ ...prev, ...detail }));
       }
     } catch (error) {
       console.error("Failed to fetch thread details:", error);
@@ -133,6 +99,21 @@ const ChatHistoryRight = () => {
     fetchMessages();
   }, [threadId, selectedChatbot?.id, fetchMessages, fetchThreadDetails]);
 
+  // Merge appearance icons (botIconSrc / userIconSrc / agentIconSrc) from
+  // sessionStorage into threadDetails whenever the selected chatbot changes.
+  // The icons are written there by @middle/page.jsx after fetching the
+  // appearance endpoint — no extra API call needed here.
+  useEffect(() => {
+    if (!selectedChatbot?.id) return;
+    const cached = sessionStorage.getItem(
+      `chatbot_appearance_${selectedChatbot.id}`,
+    );
+    if (cached) {
+      const icons = JSON.parse(cached);
+      setThreadDetails((prev) => ({ ...(prev || {}), ...icons }));
+    }
+  }, [selectedChatbot?.id]);
+
   // Listen for thread updates from other components
   useEffect(() => {
     const handleThreadUpdate = (event) => {
@@ -142,11 +123,101 @@ const ChatHistoryRight = () => {
       }
     };
 
+    // Listen for appearance icons fetched by @middle after we mounted
+    const handleAppearanceLoaded = (event) => {
+      if (event.detail.chatbotId === selectedChatbot?.id) {
+        const { botIconSrc, userIconSrc, agentIconSrc } = event.detail;
+        setThreadDetails((prev) => ({
+          ...(prev || {}),
+          botIconSrc,
+          userIconSrc,
+          agentIconSrc,
+        }));
+      }
+    };
+
     window.addEventListener("thread-updated", handleThreadUpdate);
+    window.addEventListener(
+      "chatbot-appearance-loaded",
+      handleAppearanceLoaded,
+    );
     return () => {
       window.removeEventListener("thread-updated", handleThreadUpdate);
+      window.removeEventListener(
+        "chatbot-appearance-loaded",
+        handleAppearanceLoaded,
+      );
     };
-  }, [threadId]);
+  }, [threadId, selectedChatbot?.id]);
+
+  // Subscribe / unsubscribe from the current thread channel over WebSocket
+  useEffect(() => {
+    if (!threadId || !isConnected || !send) return;
+    send({ type: "subscribe:thread", threadId });
+    return () => {
+      send({ type: "unsubscribe:thread", threadId });
+    };
+  }, [threadId, isConnected, send]);
+
+  // React to real-time events pushed by the server for the open thread
+  useEffect(() => {
+    if (!addListener || !threadId) return;
+
+    // Thread metadata changed (status, escalation, title, etc.)
+    // Updates threadDetails so ChatHeader buttons and the message input reflect reality
+    const unsubThreadUpdated = addListener("thread:updated", (thread) => {
+      if (thread?.id !== threadId) return;
+      setThreadDetails((prev) => ({ ...(prev || {}), ...thread }));
+    });
+
+    // New message in this thread (from widget visitor, AI, or another agent tab)
+    const unsubNew = addListener("message:new", (message) => {
+      if (message?.threadId !== threadId) return;
+      setMessages((prev) => {
+        // Deduplicate: skip if we already have this message (e.g. sent from this tab)
+        if (prev.some((m) => m.id === message.id)) return prev;
+        const next = [...prev, message];
+        // Keep cache in sync so fetchMessages can't silently drop WS-added messages
+        sessionStorage.setItem(
+          `chat_messages_${threadId}`,
+          JSON.stringify(next),
+        );
+        return next;
+      });
+    });
+
+    // Message edited by an agent
+    const unsubEdited = addListener("message:edited", (message) => {
+      if (message?.threadId !== threadId) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === message.id ? { ...m, ...message } : m)),
+      );
+    });
+
+    // Reaction added to a message (e.g. thumbs-up from Messenger)
+    const unsubReaction = addListener("message:reaction", (message) => {
+      if (message?.threadId !== threadId) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === message.id ? { ...m, reaction: message.reaction } : m)),
+      );
+    });
+
+    // Thread was reset — clear messages if viewing the old thread
+    const unsubReset = addListener("thread:reset", (data) => {
+      if (data?.oldThreadId === threadId) {
+        setMessages([]);
+        setThreadDetails(null);
+      }
+    });
+
+    return () => {
+      unsubThreadUpdated();
+      unsubNew();
+      unsubEdited();
+      unsubReaction();
+      unsubReset();
+    };
+  }, [addListener, threadId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -171,124 +242,24 @@ const ChatHistoryRight = () => {
 
       if (response.data?.success) {
         const newMsg = response.data.data.message;
-
-        // Update state
-        const updatedMessages = [...messages, newMsg];
-        setMessages(updatedMessages);
         setNewMessage("");
 
-        // Update cache
-        const cacheKey = `chat_messages_${threadId}`;
-        sessionStorage.setItem(cacheKey, JSON.stringify(updatedMessages));
+        // Use functional updater to avoid stale closure; deduplicate in case
+        // the WS also delivered the same message before this response arrived.
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id)) return prev;
+          const next = [...prev, newMsg];
+          sessionStorage.setItem(
+            `chat_messages_${threadId}`,
+            JSON.stringify(next),
+          );
+          return next;
+        });
       }
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {
       setSending(false);
-    }
-  };
-
-  const updateThreadStatus = async (field, value) => {
-    if (!selectedChatbot?.id || !threadId) return;
-
-    // Optimistic update
-    setThreadDetails((prev) => ({ ...prev, [field]: value }));
-
-    try {
-      // New bulk-style endpoint for single update
-      // Endpoint: PATCH /chatting/:chatbotId/thread/update-thread
-      // Body: [ { threadId, [field]: value } ]
-      const payload = [
-        {
-          threadId: threadId,
-          [field]: value,
-        },
-      ];
-
-      const response = await api.patch(
-        `/chatting/${selectedChatbot.id}/thread/update-thread`,
-        payload,
-      );
-
-      if (response.data?.success) {
-        toast.success(
-          `Thread marked as ${field === "important" ? (value ? "important" : "not important") : value ? "resolved" : "unresolved"}`,
-        );
-
-        // Handle transparency with new response format: returns { updatedThreads: [[{...}]] }
-        const updatedThreads = response.data.data.updatedThreads;
-        if (
-          updatedThreads &&
-          updatedThreads.length > 0 &&
-          updatedThreads[0].length > 0
-        ) {
-          const updatedThread = updatedThreads[0][0];
-          setThreadDetails((prev) => ({ ...prev, ...updatedThread }));
-        } else {
-          // Fallback if response structure isn't exactly as expected but success is true
-          fetchThreadDetails();
-        }
-      }
-    } catch (error) {
-      console.error(`Failed to update ${field}:`, error);
-      toast.error(`Failed to update thread status`);
-      // Revert optimistic update
-      setThreadDetails((prev) => ({ ...prev, [field]: !value }));
-    }
-  };
-
-  const handleTitleSave = async () => {
-    if (!selectedChatbot?.id || !threadId || !editedTitle.trim()) return;
-
-    try {
-      const payload = [
-        {
-          threadId: threadId,
-          title: editedTitle.trim(),
-        },
-      ];
-
-      const response = await api.patch(
-        `/chatting/${selectedChatbot.id}/thread/update-thread`,
-        payload,
-      );
-
-      if (response.data?.success) {
-        toast.success("Thread title updated successfully");
-        const newTitle = editedTitle.trim();
-
-        setThreadDetails((prev) => {
-          const updated = { ...prev, title: newTitle };
-          // Update individual thread cache
-          sessionStorage.setItem(
-            `thread_meta_${threadId}`,
-            JSON.stringify(updated),
-          );
-          return updated;
-        });
-        setIsEditingTitle(false);
-
-        // Update thread list cache
-        const listCacheKey = `chat_threads_${selectedChatbot.id}`;
-        const cachedList = sessionStorage.getItem(listCacheKey);
-        if (cachedList) {
-          const threads = JSON.parse(cachedList);
-          const updatedThreads = threads.map((t) =>
-            t.id === threadId ? { ...t, title: newTitle } : t,
-          );
-          sessionStorage.setItem(listCacheKey, JSON.stringify(updatedThreads));
-        }
-
-        // Dispatch event for cross-component sync
-        window.dispatchEvent(
-          new CustomEvent("thread-updated", {
-            detail: { threadId, title: newTitle },
-          }),
-        );
-      }
-    } catch (error) {
-      console.error("Failed to update thread title:", error);
-      toast.error("Failed to update thread title");
     }
   };
 
@@ -343,44 +314,6 @@ const ChatHistoryRight = () => {
     }
   };
 
-  const handleDownloadChat = async () => {
-    setDownloading(true);
-    try {
-      // Use existing messages logic
-      const csvContent =
-        "ThreadID,Role,Content,Time\n" +
-        messages
-          .map(
-            (msg) =>
-              `${threadId},${msg.role},"${msg.content.replace(/"/g, '""')}","${new Date(msg.createdAt).toLocaleString()}"`,
-          )
-          .join("\n");
-
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute(
-        "download",
-        `chat_export_${threadId}_${new Date().toISOString().split("T")[0]}.csv`,
-      );
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (error) {
-      console.error("Download failed:", error);
-      toast.error("Failed to download chat");
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const handleCopyLink = () => {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url);
-    toast.success("Link copied to clipboard");
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleString("en-US", {
@@ -409,232 +342,18 @@ const ChatHistoryRight = () => {
   return (
     <div className="bg-background flex h-full flex-col">
       {/* Header */}
-      <div className="bg-card/50 flex items-center justify-between border-b px-4 py-2">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9 border">
-            <AvatarImage src={threadDetails?.userIconSrc} />
-            <AvatarFallback className="bg-muted text-xs">
-              {threadDetails?.visitorName
-                ? threadDetails.visitorName.slice(0, 2).toUpperCase()
-                : "VI"}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            {isEditingTitle ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  value={editedTitle}
-                  onChange={(e) => setEditedTitle(e.target.value)}
-                  className="h-7 w-[200px] text-sm"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleTitleSave();
-                    if (e.key === "Escape") {
-                      setIsEditingTitle(false);
-                      setEditedTitle(
-                        threadDetails?.title ||
-                          threadDetails?.visitorName ||
-                          "Visitor",
-                      );
-                    }
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-green-600 hover:text-green-700"
-                  onClick={handleTitleSave}
-                >
-                  <Check className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-red-600 hover:text-red-700"
-                  onClick={() => {
-                    setIsEditingTitle(false);
-                    setEditedTitle(
-                      threadDetails?.title ||
-                        threadDetails?.visitorName ||
-                        "Visitor",
-                    );
-                  }}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="group flex items-center gap-2">
-                <h3 className="text-sm font-semibold">
-                  {threadDetails?.title ||
-                    threadDetails?.visitorName ||
-                    "Visitor"}
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-foreground h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={() => {
-                    setEditedTitle(
-                      threadDetails?.title ||
-                        threadDetails?.visitorName ||
-                        "Visitor",
-                    );
-                    setIsEditingTitle(true);
-                  }}
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-              </div>
-            )}
-            <div className="text-muted-foreground flex items-center gap-2 text-[10px]">
-              {threadDetails?.visitorEmail && (
-                <span>{threadDetails.visitorEmail}</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-foreground h-8 w-8"
-                onClick={() => {
-                  fetchThreadDetails();
-                  setIsDetailOpen(true);
-                }}
-              >
-                <Tag className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Modify Tags</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "h-8 w-8 transition-colors",
-                  threadDetails?.important
-                    ? "text-yellow-500 hover:text-yellow-600"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() =>
-                  updateThreadStatus("important", !threadDetails?.important)
-                }
-              >
-                <Star
-                  className={cn(
-                    "h-4 w-4",
-                    threadDetails?.important ? "fill-current" : "",
-                  )}
-                />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Mark as Important</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "h-8 w-8 transition-colors",
-                  threadDetails?.resolved
-                    ? "text-emerald-500 hover:text-emerald-600"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() =>
-                  updateThreadStatus("resolved", !threadDetails?.resolved)
-                }
-              >
-                <CheckCircle className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Mark as Resolved</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-foreground h-8 w-8"
-                onClick={handleDownloadChat}
-                disabled={downloading}
-              >
-                {downloading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Download Chat</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="data-[state=open]:bg-muted text-muted-foreground hover:text-foreground h-8 w-8"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem disabled>
-                <MailOpen className="mr-2 h-4 w-4" />
-                Mark as unread
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleCopyLink}>
-                <Copy className="mr-2 h-4 w-4" />
-                Copy Link
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open as User
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-red-600 focus:text-red-600"
-                disabled
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Conversation
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="ml-2 h-8 gap-2 px-3 text-xs"
-            onClick={() => {
-              fetchThreadDetails();
-              setIsDetailOpen(true);
-            }}
-          >
-            <Info className="h-3.5 w-3.5" />
-            View Detail
-          </Button>
-        </div>
-      </div>
+      <ChatHeader
+        threadId={threadId}
+        chatbotId={selectedChatbot?.id}
+        threadDetails={threadDetails}
+        onThreadDetailsChange={setThreadDetails}
+        messages={messages}
+        onMessagesChange={setMessages}
+        onOpenDetail={() => {
+          fetchThreadDetails();
+          setIsDetailOpen(true);
+        }}
+      />
 
       {/* Messages Area */}
       <ScrollArea className="min-h-0 flex-1 p-4">
@@ -669,12 +388,37 @@ const ChatHistoryRight = () => {
 
       {/* Input Area */}
       <div className="bg-background border-t p-4">
+        {threadDetails?.platformSource === "ZOHO_SALES_IQ" ? (
+          <p className="text-muted-foreground mb-2 text-center text-xs">
+            Zoho SalesIQ does not support sending messages from here. Please
+            reply to the visitor using the{" "}
+            <a
+              href="https://www.zoho.com/salesiq"
+              target="_blank"
+              rel="noreferrer"
+              className="underline font-medium"
+            >
+              Zoho SalesIQ portal
+            </a>
+            .
+          </p>
+        ) : !threadDetails?.escalated ? (
+          <p className="text-muted-foreground mb-2 text-center text-xs">
+            This thread has not been escalated to a human agent. Messaging is
+            disabled.
+          </p>
+        ) : null}
         <div className="flex gap-2">
           <Textarea
-            placeholder="Type your message... {{{Image sharing option coming soon...}}}"
+            placeholder={
+              threadDetails?.platformSource === "ZOHO_SALES_IQ"
+                ? "Messaging disabled — reply via Zoho SalesIQ portal"
+                : "Type your message... {{{Image sharing option coming soon...}}}"
+            }
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             className="max-h-[150px] min-h-[50px] resize-none"
+            disabled={!threadDetails?.escalated || threadDetails?.platformSource === "ZOHO_SALES_IQ"}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -685,7 +429,9 @@ const ChatHistoryRight = () => {
           <Button
             size="icon"
             onClick={handleSendMessage}
-            disabled={sending || !newMessage.trim()}
+            disabled={
+              sending || !newMessage.trim() || !threadDetails?.escalated || threadDetails?.platformSource === "ZOHO_SALES_IQ"
+            }
             className="h-[50px] w-[50px]"
           >
             <Send className="h-5 w-5" />

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import api from "@/lib/axios";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
 const GeneralTab = () => {
   const router = useRouter();
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
 
   const [chatbotId, setChatbotId] = useState("");
   const [name, setName] = useState("");
@@ -138,6 +140,10 @@ const GeneralTab = () => {
     }
   }, [selectedChatbot]);
 
+  useEffect(() => {
+    return () => markClean();
+  }, [markClean]);
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(chatbotId);
     toast.success("Chatbot ID copied to clipboard");
@@ -199,6 +205,7 @@ const GeneralTab = () => {
         toast.success(
           settingsResponse.data.message || "Settings updated successfully",
         );
+        markClean();
       } else {
         toast.error(
           settingsResponse.data.message || "Failed to update settings",
@@ -237,7 +244,7 @@ const GeneralTab = () => {
 
       if (response.data.success) {
         toast.success(response.data.message || "Chatbot deleted successfully");
-        router.push("/dashboard");
+        router.push("/select-chatbot");
       } else {
         toast.error(response.data.message || "Failed to delete chatbot");
       }
@@ -306,7 +313,7 @@ const GeneralTab = () => {
             <Input
               id="name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); markDirty(); }}
               className="border-gray-200 focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
@@ -323,7 +330,7 @@ const GeneralTab = () => {
               <Textarea
                 id="description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => { setDescription(e.target.value); markDirty(); }}
                 placeholder=""
                 className="min-h-[120px] resize-none border-gray-200 focus:border-blue-500 focus:ring-blue-500"
               />
@@ -360,7 +367,7 @@ const GeneralTab = () => {
             <Textarea
               id="fallback-message"
               value={fallbackMessage}
-              onChange={(e) => setFallbackMessage(e.target.value)}
+              onChange={(e) => { setFallbackMessage(e.target.value); markDirty(); }}
               placeholder=""
               className="min-h-[100px] resize-none border-gray-200 text-[14px] focus:border-blue-500 focus:ring-blue-500"
             />
@@ -377,13 +384,14 @@ const GeneralTab = () => {
                 Disable smart follow up questions
               </Label>
               <p className="text-muted-foreground max-w-[650px] text-[12px] leading-relaxed">
-                SiteGPT suggests smart follow up questions to help the user get
-                required information faster. Click this toggle to disable it.
+                contextGPT suggests smart follow up questions to help the user
+                get required information faster. Click this toggle to disable
+                it.
               </p>
             </div>
             <Switch
               checked={disableSmartFollowup}
-              onCheckedChange={setDisableSmartFollowup}
+              onCheckedChange={(v) => { setDisableSmartFollowup(v); markDirty(); }}
               className="data-[state=checked]:bg-blue-600"
             />
           </div>
@@ -400,9 +408,10 @@ const GeneralTab = () => {
               id="smart-follow-up-count"
               type="number"
               value={numberOfSmartFollowupQuestionShown}
-              onChange={(e) =>
+              onChange={(e) => {
                 setNumberOfSmartFollowupQuestionShown(e.target.value)
-              }
+                markDirty();
+              }}
               className="border-gray-200"
             />
             <p className="text-muted-foreground text-[12px] leading-relaxed">
@@ -423,7 +432,7 @@ const GeneralTab = () => {
             </div>
             <Switch
               checked={disableLeadNotifications}
-              onCheckedChange={setDisableLeadNotifications}
+              onCheckedChange={(v) => { setDisableLeadNotifications(v); markDirty(); }}
               className="data-[state=checked]:bg-blue-600"
             />
           </div>
@@ -441,7 +450,7 @@ const GeneralTab = () => {
             </div>
             <Switch
               checked={enablePageContextAwareness}
-              onCheckedChange={setEnablePageContextAwareness}
+              onCheckedChange={(v) => { setEnablePageContextAwareness(v); markDirty(); }}
               className="data-[state=checked]:bg-blue-600"
             />
           </div>
@@ -458,7 +467,7 @@ const GeneralTab = () => {
               id="history-messages"
               type="number"
               value={historyMessageContext}
-              onChange={(e) => setHistoryMessageContext(e.target.value)}
+              onChange={(e) => { setHistoryMessageContext(e.target.value); markDirty(); }}
               className="border-gray-200"
             />
             <p className="text-muted-foreground text-[12px] leading-relaxed">
@@ -476,25 +485,17 @@ const GeneralTab = () => {
             </Label>
             <Select
               value={llmModel || undefined}
-              onValueChange={(val) => setLlmModel(val)}
+              onValueChange={(val) => { setLlmModel(val); markDirty(); }}
             >
               <SelectTrigger id="gpt-model" className="w-full border-gray-200">
                 <SelectValue placeholder="Select the GPT model" />
               </SelectTrigger>
               <SelectContent>
-                {availableModels.length > 0 ? (
-                  availableModels.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.title}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <>
-                    <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                    <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                    <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-                  </>
-                )}
+                {availableModels.filter((m) => m.provider?.toLowerCase() === "openai").map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.title}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-[12px] leading-relaxed">
@@ -519,7 +520,7 @@ const GeneralTab = () => {
             <div className="flex items-center justify-center rounded p-1 transition-colors hover:bg-gray-50">
               <Switch
                 checked={limitMessagesPerConversation}
-                onCheckedChange={setLimitMessagesPerConversation}
+                onCheckedChange={(v) => { setLimitMessagesPerConversation(v); markDirty(); }}
                 className="data-[state=checked]:bg-blue-600"
               />
             </div>
@@ -542,7 +543,7 @@ const GeneralTab = () => {
               id="max-messages"
               type="number"
               value={maxMessagesPerConversation}
-              onChange={(e) => setMaxMessagesPerConversation(e.target.value)}
+              onChange={(e) => { setMaxMessagesPerConversation(e.target.value); markDirty(); }}
               disabled={!limitMessagesPerConversation}
               className={`border-gray-200 ${!limitMessagesPerConversation ? "bg-gray-50/50" : ""}`}
             />

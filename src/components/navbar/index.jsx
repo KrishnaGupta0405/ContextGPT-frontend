@@ -18,8 +18,17 @@ import {
   CircleDashedIcon,
   LogOut,
   LayoutDashboard,
+  BookOpen,
+  Rss,
+  FileText,
+  Clock,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import {
+  TOOL_CATEGORIES,
+  getToolsByCategory,
+} from "@/app/(not-protected)/tools/_config/tools.config";
 
 const components = [
   {
@@ -59,6 +68,12 @@ const components = [
   },
 ];
 
+// Compact tool links shown in the navbar dropdown (first 4 per category)
+const NAV_TOOLS = TOOL_CATEGORIES.reduce((acc, cat) => {
+  acc[cat] = getToolsByCategory(cat).slice(0, 4);
+  return acc;
+}, {});
+
 export default function NavigationMenuDemo() {
   const { user, logout } = useAuth();
   const [isVisible, setIsVisible] = React.useState(true);
@@ -92,13 +107,47 @@ export default function NavigationMenuDemo() {
       )}
     >
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3">
-        <div className="flex items-center">
-          <Link href="/" className="text-xl font-bold tracking-tight">
-            Context<span className="text-blue-600">GPT</span>
+        <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
+            <img
+              src="/icons/Contextgpt_icon.png"
+              alt="ContextGPT"
+              className="-mt-2 h-10 w-full"
+            />
+            <span
+              className="text-2xl tracking-tight"
+              style={{ fontWeight: 650 }}
+            >
+              Context
+              <span className="text-blue-600" style={{ fontWeight: 650 }}>
+                GPT
+              </span>
+            </span>
           </Link>
         </div>
         <NavigationMenu>
           <NavigationMenuList>
+            <NavigationMenuItem>
+              <Link href="/lead-generation" legacyBehavior passHref>
+                <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  Lead Generation
+                </NavigationMenuLink>
+              </Link>
+            </NavigationMenuItem>
+            <NavigationMenuItem>
+              <Link href="/features" legacyBehavior passHref>
+                <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  Features
+                </NavigationMenuLink>
+              </Link>
+            </NavigationMenuItem>
+            <NavigationMenuItem>
+              <Link href="/integration" legacyBehavior passHref>
+                <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  Integrations
+                </NavigationMenuLink>
+              </Link>
+            </NavigationMenuItem>
             <NavigationMenuItem>
               <Link href="/pricing" legacyBehavior passHref>
                 <NavigationMenuLink className={navigationMenuTriggerStyle()}>
@@ -106,112 +155,154 @@ export default function NavigationMenuDemo() {
                 </NavigationMenuLink>
               </Link>
             </NavigationMenuItem>
+            {/* Resources dropdown */}
             <NavigationMenuItem>
-              <NavigationMenuTrigger>Getting started</NavigationMenuTrigger>
+              <NavigationMenuTrigger>Resources</NavigationMenuTrigger>
               <NavigationMenuContent>
-                <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
-                  <li className="row-span-3">
-                    <NavigationMenuLink asChild>
-                      <a
-                        className="from-muted/50 to-muted flex h-full w-full flex-col justify-end rounded-md bg-gradient-to-b p-6 no-underline outline-none select-none focus:shadow-md"
-                        href="/"
-                      >
-                        <div className="mt-4 mb-2 text-lg font-medium">
-                          shadcn/ui
-                        </div>
-                        <p className="text-muted-foreground text-sm leading-tight">
-                          Beautifully designed components built with Radix UI
-                          and Tailwind CSS.
+                <div className="w-[580px] p-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Left: Quick Links */}
+                    <div>
+                      <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-widest text-blue-600 uppercase">
+                        Quick Links
+                      </p>
+                      <ul>
+                        {[
+                          {
+                            href: "/blog",
+                            icon: <Rss className="h-4 w-4" />,
+                            title: "Blog",
+                            description: "Product updates, tips, and insights",
+                          },
+                          {
+                            href: "/docs",
+                            icon: <FileText className="h-4 w-4" />,
+                            title: "Docs",
+                            description:
+                              "API documentation and developer guides",
+                          },
+                          {
+                            href: "/aboutus",
+                            icon: <BookOpen className="h-4 w-4" />,
+                            title: "About Us",
+                            description: "Learn about our mission and team",
+                          },
+                          {
+                            href: "/changelog",
+                            icon: <Clock className="h-4 w-4" />,
+                            title: "Changelog",
+                            description:
+                              "Stay up to date with the latest updates",
+                          },
+                        ].map((item) => (
+                          <li key={item.href}>
+                            <NavigationMenuLink asChild>
+                              <Link
+                                href={item.href}
+                                className="hover:bg-accent hover:text-accent-foreground flex items-start gap-3 rounded-md px-3 py-2 no-underline transition-colors outline-none select-none"
+                              >
+                                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border bg-white text-base shadow-sm">
+                                  {item.icon}
+                                </span>
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-sm leading-none font-medium">
+                                    {item.title}
+                                  </span>
+                                  <span className="text-muted-foreground line-clamp-1 text-xs leading-snug">
+                                    {item.description}
+                                  </span>
+                                </div>
+                              </Link>
+                            </NavigationMenuLink>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Right: Featured card */}
+                    <div className="flex flex-col gap-2">
+                      <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-widest text-blue-600 uppercase">
+                        What&apos;s New
+                      </p>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/features"
+                          className="group flex flex-col overflow-hidden rounded-xl border no-underline shadow-sm transition-shadow hover:shadow-md"
+                        >
+                          <div className="flex items-center justify-center gap-3 bg-linear-to-br from-blue-500 to-blue-700 px-4 py-6">
+                            <Zap className="h-8 w-8 text-white opacity-90" />
+                            <span className="text-lg font-bold text-white">
+                              ContextGPT
+                            </span>
+                          </div>
+                          <div className="bg-background px-4 py-3">
+                            <p className="text-sm font-semibold">
+                              AI-Powered Context Engine
+                            </p>
+                            <p className="text-muted-foreground mt-0.5 text-xs">
+                              Connect your data sources and chat instantly
+                            </p>
+                          </div>
+                        </Link>
+                      </NavigationMenuLink>
+                    </div>
+                  </div>
+                </div>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
+
+            {/* Tools mega-dropdown */}
+            <NavigationMenuItem>
+              <NavigationMenuTrigger>Free Tools</NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <div className="w-[700px] p-4">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+                    {TOOL_CATEGORIES.map((cat) => (
+                      <div key={cat}>
+                        <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-widest text-blue-600 uppercase">
+                          {cat}
                         </p>
-                      </a>
-                    </NavigationMenuLink>
-                  </li>
-                  <ListItem href="/docs" title="Introduction">
-                    Re-usable components built with Tailwind CSS.
-                  </ListItem>
-                  <ListItem href="/docs/installation" title="Installation">
-                    How to install dependencies and structure your app.
-                  </ListItem>
-                  <ListItem
-                    href="/docs/primitives/typography"
-                    title="Typography"
-                  >
-                    Styles for headings, paragraphs, lists...etc
-                  </ListItem>
-                </ul>
-              </NavigationMenuContent>
-            </NavigationMenuItem>
+                        <ul>
+                          {NAV_TOOLS[cat].map((tool) => (
+                            <li key={tool.slug}>
+                              <NavigationMenuLink asChild>
+                                <Link
+                                  href={`/tools/${tool.slug}`}
+                                  className="hover:bg-accent hover:text-accent-foreground flex items-start gap-3 rounded-md px-3 py-2 no-underline transition-colors outline-none select-none"
+                                >
+                                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border bg-white text-base shadow-sm">
+                                    {tool.icon}
+                                  </span>
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-sm leading-none font-medium">
+                                      {tool.title}
+                                    </span>
+                                    <span className="text-muted-foreground line-clamp-1 text-xs leading-snug">
+                                      {tool.description}
+                                    </span>
+                                  </div>
+                                </Link>
+                              </NavigationMenuLink>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
 
-            <NavigationMenuItem className="hidden md:flex">
-              <NavigationMenuTrigger>Components</NavigationMenuTrigger>
-              <NavigationMenuContent>
-                <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                  {components.map((component) => (
-                    <ListItem
-                      key={component.title}
-                      title={component.title}
-                      href={component.href}
-                    >
-                      {component.description}
-                    </ListItem>
-                  ))}
-                </ul>
-              </NavigationMenuContent>
-            </NavigationMenuItem>
-
-            <NavigationMenuItem>
-              <NavigationMenuTrigger>With Icon</NavigationMenuTrigger>
-              <NavigationMenuContent>
-                <ul className="grid w-[200px] gap-3 p-4">
-                  <li>
+                  {/* Footer link */}
+                  <div className="mt-3 border-t border-gray-100 pt-3">
                     <NavigationMenuLink asChild>
                       <Link
-                        href="#"
-                        className="hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex w-full items-center gap-2 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none"
+                        href="/tools"
+                        className="flex items-center gap-1.5 px-3 text-xs font-semibold text-blue-600 no-underline hover:underline"
                       >
-                        <CircleAlertIcon className="h-4 w-4" />
-                        <div className="text-sm leading-none font-medium">
-                          Backlog
-                        </div>
+                        View all free tools →
                       </Link>
                     </NavigationMenuLink>
-                  </li>
-                  <li>
-                    <NavigationMenuLink asChild>
-                      <Link
-                        href="#"
-                        className="hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex w-full items-center gap-2 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none"
-                      >
-                        <CircleDashedIcon className="h-4 w-4" />
-                        <div className="text-sm leading-none font-medium">
-                          To Do
-                        </div>
-                      </Link>
-                    </NavigationMenuLink>
-                  </li>
-                  <li>
-                    <NavigationMenuLink asChild>
-                      <Link
-                        href="#"
-                        className="hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex w-full items-center gap-2 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none"
-                      >
-                        <CircleCheckIcon className="h-4 w-4" />
-                        <div className="text-sm leading-none font-medium">
-                          Done
-                        </div>
-                      </Link>
-                    </NavigationMenuLink>
-                  </li>
-                </ul>
+                  </div>
+                </div>
               </NavigationMenuContent>
-            </NavigationMenuItem>
-
-            <NavigationMenuItem>
-              <Link href="/docs" legacyBehavior passHref>
-                <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                  Docs
-                </NavigationMenuLink>
-              </Link>
             </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>

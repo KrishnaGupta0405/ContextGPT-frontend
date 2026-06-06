@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import api from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   Select,
-  SelectContent,
+  SelectContent, 
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -106,6 +107,89 @@ const allFields = [
   "continueButton",
   "submittingText",
   "inputDisabledPlaceholder",
+  // ChatBubble
+  "closeChatLabel",
+  "openChatLabel",
+  "chatBubbleAlt",
+  "closeTooltipLabel",
+  // ConnectionStatus
+  "connectionLostReconnecting",
+  // Header
+  "conversationExportTitle",
+  "dateLabel",
+  "threadIdLabel",
+  "notAvailable",
+  "backLabel",
+  "openExternalLinkLabel",
+  "moreOptionsLabel",
+  "refreshChat",
+  "downloadMenuLabel",
+  "messagesMenuLabel",
+  "accountMenuLabel",
+  "collapseChatLabel",
+  "expandChatLabel",
+  "closeChatWindowLabel",
+  "startNewConversationLabel",
+  // InputBar
+  "conversationEnded",
+  "sendMessageLabel",
+  // LeadForm extras
+  "bookingPageLoadError",
+  "bookingPageTitle",
+  "nameFieldPlaceholder",
+  "emailFieldPlaceholder",
+  "phoneFieldPlaceholder",
+  "fieldRequired",
+  "skipButton",
+  // Message
+  "escalatedToHumanAgent",
+  "returnedToAi",
+  "helpfulFeedbackLabel",
+  "notHelpfulFeedbackLabel",
+  // ThreadList
+  "yourConversationsTitle",
+  "newConversationButton",
+  // ThreadItem
+  "justNow",
+  "minutesAgoFormat",
+  "hoursAgoFormat",
+  "threadEnded",
+  // EmailStep
+  "createAccountTitle",
+  "enterEmailSubtitle",
+  "alreadyHaveAccount",
+  "loginLinkText",
+  // OtpStep
+  "passwordMinLength",
+  "passwordsMismatch",
+  "otpSentToEmail",
+  "passwordPlaceholder",
+  "confirmPasswordPlaceholder",
+  "creatingAccount",
+  "useAnotherEmail",
+  // LoginForm
+  "welcomeBackTitle",
+  "loginWithEmailSubtitle",
+  "passwordFieldPlaceholder",
+  "loginButtonText",
+  "forgotPasswordLink",
+  "noAccountQuestion",
+  "signupLinkText",
+  // ForgotPasswordFlow
+  "passwordResetSuccess",
+  "passwordResetTitle",
+  "backToLoginButton",
+  "forgotPasswordTitle",
+  "forgotPasswordInstructions",
+  "resetPasswordTitle",
+  "passwordResetCodeSent",
+  "newPasswordPlaceholder",
+  "confirmNewPasswordPlaceholder",
+  "resetPasswordButton",
+  // PoweredBy
+  "poweredByLabel",
+  // LoadingScreen
+  "retryButton",
 ];
 
 const formSchema = z.object({
@@ -229,12 +313,139 @@ const sections = [
       "continueButton",
       "submittingText",
       "inputDisabledPlaceholder",
+      "bookingPageLoadError",
+      "bookingPageTitle",
+      "nameFieldPlaceholder",
+      "emailFieldPlaceholder",
+      "phoneFieldPlaceholder",
+      "fieldRequired",
+      "skipButton",
     ],
+  },
+  {
+    title: "Chat Bubble",
+    description: "Chat bubble button labels and accessibility text",
+    fields: [
+      "closeChatLabel",
+      "openChatLabel",
+      "chatBubbleAlt",
+      "closeTooltipLabel",
+    ],
+  },
+  {
+    title: "Header",
+    description: "Header menu items, aria-labels, and export text",
+    fields: [
+      "conversationExportTitle",
+      "dateLabel",
+      "threadIdLabel",
+      "notAvailable",
+      "backLabel",
+      "openExternalLinkLabel",
+      "moreOptionsLabel",
+      "refreshChat",
+      "downloadMenuLabel",
+      "messagesMenuLabel",
+      "accountMenuLabel",
+      "collapseChatLabel",
+      "expandChatLabel",
+      "closeChatWindowLabel",
+      "startNewConversationLabel",
+      "connectionLostReconnecting",
+    ],
+  },
+  {
+    title: "Input Bar",
+    description: "Input bar text and accessibility labels",
+    fields: ["conversationEnded", "sendMessageLabel"],
+  },
+  {
+    title: "Message",
+    description: "System messages and feedback button labels",
+    fields: [
+      "escalatedToHumanAgent",
+      "returnedToAi",
+      "helpfulFeedbackLabel",
+      "notHelpfulFeedbackLabel",
+    ],
+  },
+  {
+    title: "Thread List",
+    description: "Thread list header and button text",
+    fields: ["yourConversationsTitle", "newConversationButton"],
+  },
+  {
+    title: "Thread Item",
+    description: "Relative time formats and thread status badges",
+    fields: ["justNow", "minutesAgoFormat", "hoursAgoFormat", "threadEnded"],
+  },
+  {
+    title: "Email Step",
+    description: "New user email entry screen text",
+    fields: [
+      "createAccountTitle",
+      "enterEmailSubtitle",
+      "alreadyHaveAccount",
+      "loginLinkText",
+    ],
+  },
+  {
+    title: "OTP Step",
+    description: "OTP verification and password setup text",
+    fields: [
+      "passwordMinLength",
+      "passwordsMismatch",
+      "otpSentToEmail",
+      "passwordPlaceholder",
+      "confirmPasswordPlaceholder",
+      "creatingAccount",
+      "useAnotherEmail",
+    ],
+  },
+  {
+    title: "Login Form",
+    description: "Login screen text and links",
+    fields: [
+      "welcomeBackTitle",
+      "loginWithEmailSubtitle",
+      "passwordFieldPlaceholder",
+      "loginButtonText",
+      "forgotPasswordLink",
+      "noAccountQuestion",
+      "signupLinkText",
+    ],
+  },
+  {
+    title: "Forgot Password",
+    description: "Password reset flow text",
+    fields: [
+      "passwordResetSuccess",
+      "passwordResetTitle",
+      "backToLoginButton",
+      "forgotPasswordTitle",
+      "forgotPasswordInstructions",
+      "resetPasswordTitle",
+      "passwordResetCodeSent",
+      "newPasswordPlaceholder",
+      "confirmNewPasswordPlaceholder",
+      "resetPasswordButton",
+    ],
+  },
+  {
+    title: "Powered By",
+    description: "Powered by watermark label",
+    fields: ["poweredByLabel"],
+  },
+  {
+    title: "Loading Screen",
+    description: "Loading screen retry button text",
+    fields: ["retryButton"],
   },
 ];
 
 const LocalizationTab = () => {
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isNewRecord, setIsNewRecord] = useState(false);
@@ -249,6 +460,18 @@ const LocalizationTab = () => {
       fetchSettings();
     }
   }, [selectedChatbot]);
+
+  useEffect(() => {
+    if (form.formState.isDirty) {
+      markDirty();
+    } else {
+      markClean();
+    }
+  }, [form.formState.isDirty, markDirty, markClean]);
+
+  useEffect(() => {
+    return () => markClean();
+  }, [markClean]);
 
   const fetchSettings = async () => {
     setInitialLoading(true);
@@ -320,6 +543,7 @@ const LocalizationTab = () => {
             : "Localization settings updated",
         );
         if (isNewRecord) setIsNewRecord(false);
+        form.reset(values);
       }
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to save settings");

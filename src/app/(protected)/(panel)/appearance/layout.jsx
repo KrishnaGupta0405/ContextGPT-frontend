@@ -11,10 +11,10 @@ export default function AppearanceLayout({ children, middle, right }) {
         ]}
       />
       <div className="flex flex-1 overflow-hidden">
-        <div className="bg-background w-2/3 min-w-[300px] border-r">
+        <div className="bg-background w-full lg:w-2/3 min-w-[300px] border-r">
           {middle}
         </div>
-        <div className="bg-background flex-1">{right}</div>
+        <div className="bg-background hidden flex-1 lg:block">{right}</div>
       </div>
     </div>
   );

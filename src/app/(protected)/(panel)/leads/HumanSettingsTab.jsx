@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useChatbot } from "@/context/ChatbotContext";
@@ -36,6 +37,7 @@ const formSchema = z.object({
 
 const HumanSettingsTab = () => {
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isNewSettings, setIsNewSettings] = useState(false);
@@ -59,6 +61,20 @@ const HumanSettingsTab = () => {
   const showEscalationButtons = form.watch(
     "showEscalationButtonsAfterResponses",
   );
+
+  // Sync form dirty state to unsaved changes context
+  useEffect(() => {
+    if (form.formState.isDirty) {
+      markDirty();
+    } else {
+      markClean();
+    }
+  }, [form.formState.isDirty, markDirty, markClean]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => markClean();
+  }, [markClean]);
 
   useEffect(() => {
     if (selectedChatbot?.id || selectedChatbot?.chatbotId) {

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Play } from "lucide-react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
@@ -24,6 +25,7 @@ const VALID_TABS = [
 ];
 
 const SettingsPage = () => {
+  const { guardNavigation } = useUnsavedChanges();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -34,7 +36,7 @@ const SettingsPage = () => {
     if (tabParam && VALID_TABS.includes(tabParam)) {
       return tabParam;
     }
-    return "localization";
+    return "general";
   }, [tabParam]);
 
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -46,10 +48,12 @@ const SettingsPage = () => {
   }, [tabParam, activeTab]);
 
   const handleTabChange = (value) => {
-    setActiveTab(value);
-    const params = new URLSearchParams(searchParams);
-    params.set("tab", value);
-    router.replace(`${pathname}?${params.toString()}`);
+    guardNavigation(() => {
+      setActiveTab(value);
+      const params = new URLSearchParams(searchParams);
+      params.set("tab", value);
+      router.replace(`${pathname}?${params.toString()}`);
+    });
   };
 
   return (

@@ -2,11 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import api from "@/lib/axios";
 import { toast } from "sonner";
 
 const ChatModesTab = () => {
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
   const [initialLoading, setInitialLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [chatStart, setChatStart] = useState("ai");
@@ -16,6 +18,10 @@ const ChatModesTab = () => {
       fetchSettings();
     }
   }, [selectedChatbot]);
+
+  useEffect(() => {
+    return () => markClean();
+  }, [markClean]);
 
   const fetchSettings = async () => {
     setInitialLoading(true);
@@ -61,6 +67,7 @@ const ChatModesTab = () => {
 
       if (response.data.success) {
         toast.success(response.data.message || "Chat mode settings saved!");
+        markClean();
       }
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to save settings");
@@ -93,7 +100,7 @@ const ChatModesTab = () => {
           {/* Always Starts New Conversation with Human */}
           <label
             className="flex cursor-pointer items-start gap-3"
-            onClick={() => setChatStart("agent")}
+            onClick={() => { setChatStart("agent"); markDirty(); }}
           >
             <div className="mt-0.5 flex items-center justify-center">
               <div
@@ -120,7 +127,7 @@ const ChatModesTab = () => {
           {/* Always Starts New Conversation with AI */}
           <label
             className="flex cursor-pointer items-start gap-3"
-            onClick={() => setChatStart("ai")}
+            onClick={() => { setChatStart("ai"); markDirty(); }}
           >
             <div className="mt-0.5 flex items-center justify-center">
               <div

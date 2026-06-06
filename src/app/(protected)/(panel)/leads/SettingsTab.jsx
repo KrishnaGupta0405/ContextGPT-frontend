@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useChatbot } from "@/context/ChatbotContext";
@@ -28,6 +29,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -36,7 +43,185 @@ import {
   AlarmClock,
   Type,
   Lightbulb,
+  ArrowUpRight,
+  Eye,
 } from "lucide-react";
+
+// ─── Live Preview ─────────────────────────────────────────────────────────────
+function LeadFormPreview({ values }) {
+  const {
+    enableLeadCollection,
+    customerNameTake,
+    customerPhoneTake,
+    customerEmailTake,
+    customerFormField,
+    bookingIntegration,
+    bookingIntegrationLink,
+  } = values;
+
+  const hasAnyField =
+    customerNameTake ||
+    customerPhoneTake ||
+    customerEmailTake ||
+    (customerFormField && customerFormField.some((f) => f.display_label));
+
+  return (
+    <div className="sticky top-6 flex flex-col gap-3">
+      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        <Eye className="h-4 w-4 text-blue-500" />
+        Live Preview
+      </div>
+
+      {/* Chatbot shell */}
+      <div className="flex flex-col overflow-hidden rounded-2xl border shadow-lg" style={{ width: "100%", maxWidth: 340 }}>
+        {/* Header */}
+        <div className="flex items-center gap-2 bg-blue-600 px-4 py-3">
+          <div className="h-7 w-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold">AI</div>
+          <span className="text-sm font-medium text-white">Chatbot Assistant</span>
+          <div className="ml-auto flex gap-1">
+            <div className="h-2 w-2 rounded-full bg-white/40" />
+            <div className="h-2 w-2 rounded-full bg-white/40" />
+            <div className="h-2 w-2 rounded-full bg-white/40" />
+          </div>
+        </div>
+
+        {/* Chat area */}
+        <div className="flex flex-col gap-2 bg-slate-50 px-3 py-3 text-xs">
+          {/* Bot message */}
+          <div className="flex items-end gap-1.5">
+            <div className="h-5 w-5 shrink-0 rounded-full bg-blue-600 flex items-center justify-center text-white text-[9px] font-bold">AI</div>
+            <div className="rounded-2xl rounded-bl-sm bg-white px-3 py-2 shadow-sm text-slate-700 max-w-[80%]">
+              Hi there! How can I help you today?
+            </div>
+          </div>
+          {/* User message */}
+          <div className="flex justify-end">
+            <div className="rounded-2xl rounded-br-sm bg-blue-600 px-3 py-2 text-white max-w-[80%]">
+              I'd like to learn more about your services.
+            </div>
+          </div>
+          {/* Bot triggering form */}
+          {enableLeadCollection && hasAnyField && (
+            <div className="flex items-end gap-1.5">
+              <div className="h-5 w-5 shrink-0 rounded-full bg-blue-600 flex items-center justify-center text-white text-[9px] font-bold">AI</div>
+              <div className="rounded-2xl rounded-bl-sm bg-white px-3 py-2 shadow-sm text-slate-700 max-w-[80%]">
+                Great! Please share a few details so we can follow up.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Lead form */}
+        <div className="border-t bg-white px-3 py-3">
+          {!enableLeadCollection ? (
+            <p className="text-center text-[11px] text-slate-400 italic py-2">
+              Enable lead collection to see the form preview
+            </p>
+          ) : !hasAnyField ? (
+            <p className="text-center text-[11px] text-slate-400 italic py-2">
+              Turn on at least one field above
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-[11px] font-semibold text-slate-700 mb-1">Share your details</p>
+              {customerNameTake && (
+                <label className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-medium text-slate-500">Name<span className="text-red-400"> *</span></span>
+                  <input
+                    readOnly
+                    placeholder="Name"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-400 outline-none"
+                  />
+                </label>
+              )}
+              {customerEmailTake && (
+                <label className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-medium text-slate-500">Email<span className="text-red-400"> *</span></span>
+                  <input
+                    readOnly
+                    placeholder="Email"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-400 outline-none"
+                  />
+                </label>
+              )}
+              {customerPhoneTake && (
+                <label className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-medium text-slate-500">Phone<span className="text-red-400"> *</span></span>
+                  <input
+                    readOnly
+                    placeholder="Phone"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-400 outline-none"
+                  />
+                </label>
+              )}
+              {(customerFormField ?? [])
+                .filter((f) => f.display_label)
+                .map((f, i) =>
+                  f.field_type === "textarea" ? (
+                    <label key={i} className="flex flex-col gap-0.5">
+                      <span className="text-[10px] font-medium text-slate-500">
+                        {f.display_label}{f.required && <span className="text-red-400"> *</span>}
+                      </span>
+                      <textarea
+                        readOnly
+                        placeholder={f.placeholder_text || ""}
+                        rows={2}
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-400 outline-none resize-none"
+                      />
+                    </label>
+                  ) : (
+                    <label key={i} className="flex flex-col gap-0.5">
+                      <span className="text-[10px] font-medium text-slate-500">
+                        {f.display_label}{f.required && <span className="text-red-400"> *</span>}
+                      </span>
+                      <input
+                        readOnly
+                        placeholder={f.placeholder_text || ""}
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-400 outline-none"
+                      />
+                    </label>
+                  ),
+                )}
+              <button
+                type="button"
+                className="mt-1 w-full rounded-lg bg-blue-600 py-1.5 text-[11px] font-semibold text-white"
+              >
+                Submit
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-lg py-1 text-[11px] text-slate-400 hover:text-slate-600"
+              >
+                Skip
+              </button>
+
+              {bookingIntegration && bookingIntegrationLink && (
+                <div className="mt-2 rounded-lg border border-dashed border-blue-200 bg-blue-50 px-2 py-2 text-center">
+                  <p className="text-[10px] font-medium text-blue-600">Booking widget will appear here</p>
+                  <p className="text-[10px] text-blue-400 truncate">{bookingIntegrationLink}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Chat input bar */}
+        <div className="flex items-center gap-1.5 border-t bg-white px-3 py-2">
+          <div className="flex-1 rounded-full border bg-slate-50 px-3 py-1.5 text-[11px] text-slate-300">
+            Type a message...
+          </div>
+          <div className="h-6 w-6 rounded-full bg-blue-600 flex items-center justify-center">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 5h8M5 1l4 4-4 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-slate-400 text-center">
+        Preview updates as you configure settings
+      </p>
+    </div>
+  );
+}
 
 // Schema based on backend constraints
 const formSchema = z.object({
@@ -61,13 +246,14 @@ const formSchema = z.object({
 
   leadNotification: z.boolean().default(false),
   leadNotificationEmail: z.string().optional(),
+  autoEscalateOnLeadCapture: z.boolean().default(false),
 
   customerFormField: z
     .array(
       z.object({
         display_label: z.string().min(1, "Label is required"),
         field_name: z.string().min(1, "Field name is required"),
-        field_type: z.enum(["text", "select"]),
+        field_type: z.enum(["text", "textarea", "email", "phone"]),
         required: z.boolean().default(false),
         placeholder_text: z.string().optional(),
         options: z.string().optional(), // Comma separated for input
@@ -85,11 +271,112 @@ const DEFAULT_CUSTOM_FIELD = {
   options: "",
 };
 
+const TEMPLATE_CONFIGS = {
+  dental: {
+    label: "Dental Clinic",
+    keywords: "appointment, consultation, teeth cleaning, dental exam, toothache, pain, emergency, insurance, cost, price",
+    fields: [
+      { display_label: "Phone Number", field_name: "phone_number", field_type: "phone", required: true, placeholder_text: "+1 (555) 000-0000", options: "" },
+      { display_label: "Preferred Appointment Time", field_name: "preferred_appointment_time", field_type: "text", required: false, placeholder_text: "e.g. Monday morning, weekdays after 3pm", options: "" },
+      { display_label: "Insurance Provider", field_name: "insurance_provider", field_type: "text", required: false, placeholder_text: "e.g. Delta Dental, Cigna", options: "" },
+    ],
+    booking: true,
+  },
+  hvac: {
+    label: "HVAC Services",
+    keywords: "repair, installation, maintenance, heating, cooling, air conditioning, furnace, AC, emergency, quote, estimate",
+    fields: [
+      { display_label: "Phone Number", field_name: "phone_number", field_type: "phone", required: true, placeholder_text: "+1 (555) 000-0000", options: "" },
+      { display_label: "Service Address", field_name: "service_address", field_type: "text", required: true, placeholder_text: "123 Main St, City, State", options: "" },
+      { display_label: "Service Needed", field_name: "service_needed", field_type: "text", required: false, placeholder_text: "e.g. AC repair, furnace installation", options: "" },
+    ],
+    booking: true,
+  },
+  legal: {
+    label: "Legal Services",
+    keywords: "consultation, legal advice, lawyer, attorney, case, lawsuit, divorce, accident, injury, contract",
+    fields: [
+      { display_label: "Phone Number", field_name: "phone_number", field_type: "phone", required: true, placeholder_text: "+1 (555) 000-0000", options: "" },
+      { display_label: "Company/Organization", field_name: "company_organization", field_type: "text", required: false, placeholder_text: "e.g. Acme Corp (leave blank if individual)", options: "" },
+      { display_label: "Type of Legal Matter", field_name: "type_of_legal_matter", field_type: "text", required: true, placeholder_text: "e.g. personal injury, contract dispute", options: "" },
+      { display_label: "Urgency Level", field_name: "urgency_level", field_type: "text", required: false, placeholder_text: "e.g. urgent, within a week, no rush", options: "" },
+    ],
+    booking: true,
+  },
+  real_estate: {
+    label: "Real Estate",
+    keywords: "property, house, home, buy, sell, rent, mortgage, viewing, tour, listing, price, market value",
+    fields: [
+      { display_label: "Phone Number", field_name: "phone_number", field_type: "phone", required: true, placeholder_text: "+1 (555) 000-0000", options: "" },
+      { display_label: "I am interested in", field_name: "interest_type", field_type: "text", required: true, placeholder_text: "e.g. buying, selling, renting", options: "" },
+      { display_label: "Preferred Location", field_name: "preferred_location", field_type: "text", required: false, placeholder_text: "e.g. Downtown Austin, TX", options: "" },
+      { display_label: "Budget Range", field_name: "budget_range", field_type: "text", required: false, placeholder_text: "e.g. $300k–$500k", options: "" },
+    ],
+    booking: true,
+  },
+  automotive: {
+    label: "Automotive",
+    keywords: "repair, service, maintenance, parts, quote, estimate, warranty, oil change, brakes, engine",
+    fields: [
+      { display_label: "Phone Number", field_name: "phone_number", field_type: "phone", required: true, placeholder_text: "+1 (555) 000-0000", options: "" },
+      { display_label: "Vehicle Make/Model/Year", field_name: "vehicle_make_model_year", field_type: "text", required: true, placeholder_text: "e.g. 2019 Toyota Camry", options: "" },
+      { display_label: "Service Needed", field_name: "service_needed", field_type: "text", required: false, placeholder_text: "e.g. oil change, brake inspection", options: "" },
+    ],
+    booking: true,
+  },
+  healthcare: {
+    label: "Healthcare",
+    keywords: "appointment, consultation, symptoms, treatment, insurance, urgent, pain, medical, doctor, specialist",
+    fields: [
+      { display_label: "Phone Number", field_name: "phone_number", field_type: "phone", required: true, placeholder_text: "+1 (555) 000-0000", options: "" },
+      { display_label: "Date of Birth", field_name: "date_of_birth", field_type: "text", required: true, placeholder_text: "MM/DD/YYYY", options: "" },
+      { display_label: "Insurance Provider", field_name: "insurance_provider", field_type: "text", required: false, placeholder_text: "e.g. Blue Cross, Aetna", options: "" },
+      { display_label: "Reason for Visit", field_name: "reason_for_visit", field_type: "textarea", required: false, placeholder_text: "Briefly describe your symptoms or reason for the appointment", options: "" },
+    ],
+    booking: true,
+  },
+  saas: {
+    label: "SaaS/Software",
+    keywords: "demo, trial, pricing, features, integration, API, support, enterprise, upgrade, subscription",
+    fields: [
+      { display_label: "Company Name", field_name: "company_name", field_type: "text", required: true, placeholder_text: "e.g. Acme Corp", options: "" },
+      { display_label: "Job Title", field_name: "job_title", field_type: "text", required: false, placeholder_text: "e.g. CTO, Product Manager", options: "" },
+      { display_label: "Company Size", field_name: "company_size", field_type: "text", required: false, placeholder_text: "e.g. 1–10, 11–50, 50+", options: "" },
+      { display_label: "Primary Use Case", field_name: "primary_use_case", field_type: "textarea", required: false, placeholder_text: "What are you hoping to accomplish with our product?", options: "" },
+    ],
+    booking: true,
+  },
+  ecommerce: {
+    label: "E-commerce",
+    keywords: "order, shipping, return, refund, product, stock, availability, bulk order, wholesale, custom",
+    fields: [
+      { display_label: "Phone Number", field_name: "phone_number", field_type: "phone", required: false, placeholder_text: "+1 (555) 000-0000", options: "" },
+      { display_label: "Business Name", field_name: "business_name", field_type: "text", required: false, placeholder_text: "e.g. My Store LLC", options: "" },
+      { display_label: "Order Type", field_name: "order_type", field_type: "text", required: true, placeholder_text: "e.g. bulk, wholesale, custom print", options: "" },
+      { display_label: "Special Requirements", field_name: "special_requirements", field_type: "textarea", required: false, placeholder_text: "Any specific quantities, sizes, or customizations?", options: "" },
+    ],
+    booking: false,
+  },
+  consulting: {
+    label: "Consulting",
+    keywords: "consultation, strategy, advice, proposal, project, scope, timeline, budget, expertise, solution",
+    fields: [
+      { display_label: "Phone Number", field_name: "phone_number", field_type: "phone", required: false, placeholder_text: "+1 (555) 000-0000", options: "" },
+      { display_label: "Company Name", field_name: "company_name", field_type: "text", required: false, placeholder_text: "e.g. Acme Corp", options: "" },
+      { display_label: "Project Type", field_name: "project_type", field_type: "text", required: true, placeholder_text: "e.g. marketing strategy, IT audit", options: "" },
+      { display_label: "Budget Range", field_name: "budget_range", field_type: "text", required: false, placeholder_text: "e.g. $5k–$20k", options: "" },
+    ],
+    booking: true,
+  },
+};
+
 const SettingsTab = () => {
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isNewSettings, setIsNewSettings] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState(null); // template waiting for keyword conflict resolution
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -106,6 +393,7 @@ const SettingsTab = () => {
       bookingIntegrationLink: "",
       leadNotification: false,
       leadNotificationEmail: "",
+      autoEscalateOnLeadCapture: false,
       customerFormField: [DEFAULT_CUSTOM_FIELD],
     },
   });
@@ -117,6 +405,102 @@ const SettingsTab = () => {
 
   const isEnabled = form.watch("enableLeadCollection");
   const industryTemplate = form.watch("industryTemplate");
+  const whenToCollectLead = form.watch("whenToCollectLead");
+
+  const previewValues = useWatch({ control: form.control });
+
+  // Sync form dirty state to unsaved changes context
+  useEffect(() => {
+    if (form.formState.isDirty) {
+      markDirty();
+    } else {
+      markClean();
+    }
+  }, [form.formState.isDirty, markDirty, markClean]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => markClean();
+  }, [markClean]);
+
+  // Track the field count at the time a template was applied
+  const lastAppliedTemplateRef = React.useRef(null);
+  const lastAppliedFieldCountRef = React.useRef(null);
+
+  // When user adds or removes a field after a template was applied, revert template to "custom"
+  useEffect(() => {
+    const currentTemplate = form.getValues("industryTemplate");
+    if (
+      currentTemplate &&
+      currentTemplate !== "custom" &&
+      lastAppliedTemplateRef.current === currentTemplate &&
+      lastAppliedFieldCountRef.current !== null &&
+      fields.length !== lastAppliedFieldCountRef.current
+    ) {
+      form.setValue("industryTemplate", "custom", { shouldDirty: false });
+      lastAppliedTemplateRef.current = null;
+      lastAppliedFieldCountRef.current = null;
+    }
+  }, [fields.length]);
+
+  const applyTemplate = (val, keywordMode) => {
+    const tpl = TEMPLATE_CONFIGS[val];
+    if (!tpl) return;
+
+    // Apply keywords
+    if (keywordMode === "replace") {
+      form.setValue("customerTriggerKeywords", tpl.keywords);
+    } else {
+      const existing = form.getValues("customerTriggerKeywords") || "";
+      const merged = existing
+        ? `${existing.replace(/,\s*$/, "")}, ${tpl.keywords}`
+        : tpl.keywords;
+      form.setValue("customerTriggerKeywords", merged);
+    }
+
+    form.setValue("bookingIntegration", tpl.booking);
+    form.setValue("customerFormField", tpl.fields);
+    lastAppliedTemplateRef.current = val;
+    lastAppliedFieldCountRef.current = tpl.fields.length;
+
+    toast.info(
+      `${tpl.label} template applied — keywords ${keywordMode === "replace" ? "replaced" : "merged"}, booking ${tpl.booking ? "enabled" : "disabled"}, and ${tpl.fields.length} field(s) added.`,
+    );
+  };
+
+  const handleTemplateChange = (val, fieldOnChange) => {
+    fieldOnChange(val);
+    if (!TEMPLATE_CONFIGS[val]) return; // "custom" selected — no auto-fill
+
+    const existingKeywords = form.getValues("customerTriggerKeywords") || "";
+
+    if (existingKeywords.trim()) {
+      // Conflict — ask user what to do
+      setPendingTemplate(val);
+      toast(
+        `You already have keywords. Replace or add ${TEMPLATE_CONFIGS[val].label} keywords?`,
+        {
+          duration: Infinity,
+          action: {
+            label: "Replace",
+            onClick: () => {
+              applyTemplate(val, "replace");
+              setPendingTemplate(null);
+            },
+          },
+          cancel: {
+            label: "Add",
+            onClick: () => {
+              applyTemplate(val, "add");
+              setPendingTemplate(null);
+            },
+          },
+        },
+      );
+    } else {
+      applyTemplate(val, "replace");
+    }
+  };
 
   useEffect(() => {
     if (selectedChatbot?.id || selectedChatbot?.chatbotId) {
@@ -161,7 +545,7 @@ const SettingsTab = () => {
         // but user says backend returns camelCase, so we trust that.
         // We do need to handle customerFormField options which might be array -> string
 
-        const formattedFormFields = (data.customerFormField || []).map((f) => ({
+        const formattedFormFields = (Array.isArray(data.customerFormField) ? data.customerFormField : []).map((f) => ({
           ...f,
           options: Array.isArray(f.options) ? f.options.join(", ") : f.options,
         }));
@@ -199,6 +583,7 @@ const SettingsTab = () => {
           bookingIntegrationLink: "",
           leadNotification: false,
           leadNotificationEmail: "",
+          autoEscalateOnLeadCapture: false,
           customerFormField: [DEFAULT_CUSTOM_FIELD],
         });
       } else {
@@ -238,7 +623,7 @@ const SettingsTab = () => {
           ...f,
           options: f.options
             ? f.options
-                .split(",")
+                .split(",") 
                 .map((o) => o.trim())
                 .filter((o) => o)
             : [],
@@ -285,7 +670,8 @@ const SettingsTab = () => {
   }
 
   return (
-    <div className="rounded-xl border bg-white p-6 shadow-sm">
+    <div className="flex gap-6 items-start">
+    <div className="min-w-0 flex-1 rounded-xl border bg-white p-6 shadow-sm">
       <div className="mb-6">
         <h3 className="text-lg font-medium">Lead Collection Settings</h3>
         <p className="text-muted-foreground text-sm">
@@ -440,7 +826,7 @@ const SettingsTab = () => {
                             className="text-sm font-normal"
                           >
                             When unable to answer
-                          </Label>
+                          </Label> 
                         </div>
                         <div className="flex items-center space-x-3">
                           <RadioGroupItem
@@ -477,16 +863,33 @@ const SettingsTab = () => {
 
             {/* Custom Trigger Keywords Section */}
             <div
-              className={`space-y-6 rounded-xl border bg-white p-6 shadow-sm ${!isEnabled ? "pointer-events-none opacity-50" : ""}`}
+              className={`space-y-6 rounded-xl border bg-white p-6 shadow-sm ${!isEnabled || whenToCollectLead === "after_n_messages" ? "pointer-events-none opacity-50" : ""}`}
             >
               <div className="flex items-start gap-4">
                 <div className="rounded-lg bg-blue-50 p-2 text-blue-500">
                   <Type className="h-6 w-6" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-slate-900">
-                    Custom Trigger Keywords
-                  </h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-lg font-semibold text-slate-900">
+                      Custom Trigger Keywords
+                    </h4>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Lightbulb className="h-4 w-4 cursor-pointer text-amber-400" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs text-xs">
+                          Works great with the{" "}
+                          <span className="font-semibold text-blue-400">
+                            "When user shows interest"
+                          </span>{" "}
+                          collection trigger — keywords help detect intent and
+                          show the lead form at the right moment.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <p className="text-muted-foreground text-sm">
                     Define specific keywords that trigger lead collection
                   </p>
@@ -505,9 +908,24 @@ const SettingsTab = () => {
                 name="customerTriggerKeywords"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm font-semibold text-slate-500">
-                      Keywords (Optional)
-                    </FormLabel>
+                    <div className="flex items-center gap-2">
+                      <FormLabel className="text-sm font-semibold text-slate-500">
+                        Keywords (Optional)
+                      </FormLabel>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-pointer rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-400 hover:bg-slate-200">
+                              ?
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs text-xs">
+                            If none provided, the system falls back to a set of
+                            specialized built-in keywords to detect user intent.
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <FormControl>
                       <Textarea
                         placeholder="pricing, demo, consultation, quote, appointment, contact, schedule, buy, purchase"
@@ -556,7 +974,7 @@ const SettingsTab = () => {
                     Template Selection
                   </FormLabel>
                   <Select
-                    onValueChange={field.onChange}
+                    onValueChange={(val) => handleTemplateChange(val, field.onChange)}
                     value={field.value || "custom"}
                     disabled={!isEnabled}
                   >
@@ -654,9 +1072,8 @@ const SettingsTab = () => {
               )}
             />
 
-            {/* Custom Form Fields - Only when Template is Custom */}
-            {industryTemplate === "custom" && (
-              <div className="mt-4 space-y-4 rounded-lg border bg-slate-50 p-4">
+            {/* Form Fields — always visible; populated by template or manually */}
+            <div className="mt-4 space-y-4 rounded-lg border bg-slate-50 p-4">
                 <h5 className="font-medium text-slate-800">
                   Custom Form Fields
                 </h5>
@@ -689,7 +1106,21 @@ const SettingsTab = () => {
                       name={`customerFormField.${index}.field_name`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Field Name</FormLabel>
+                          <FormLabel className="text-xs flex items-center gap-1">
+                            Field Name
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-500">
+                                    i
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Used internally to identify this field in lead data and integrations. <br /> Use lowercase with underscores (e.g. company_name). <br /> Not shown to the visitor.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormLabel>
                           <FormControl>
                             <Input placeholder="company_name" {...field} />
                           </FormControl>
@@ -714,13 +1145,16 @@ const SettingsTab = () => {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="text">Text</SelectItem>
-                              <SelectItem value="select">Select</SelectItem>
+                              <SelectItem value="textarea">Textarea</SelectItem>
+                              <SelectItem value="email">Email</SelectItem>
+                              <SelectItem value="phone">Phone</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                    {/* Placeholder */}
                     <FormField
                       control={form.control}
                       name={`customerFormField.${index}.placeholder_text`}
@@ -751,28 +1185,6 @@ const SettingsTab = () => {
                         </FormItem>
                       )}
                     />
-                    {/* Conditional Options Input for Select Type */}
-                    {form.watch(`customerFormField.${index}.field_type`) ===
-                      "select" && (
-                      <FormField
-                        control={form.control}
-                        name={`customerFormField.${index}.options`}
-                        render={({ field }) => (
-                          <FormItem className="col-span-1 md:col-span-2 lg:col-span-3">
-                            <FormLabel className="text-xs">
-                              Options (Comma separated)
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Morning, Afternoon, Evening"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
 
                     <Button
                       type="button"
@@ -805,7 +1217,6 @@ const SettingsTab = () => {
                   + Add Field
                 </Button>
               </div>
-            )}
           </div>
 
           {/* Integrations */}
@@ -911,6 +1322,46 @@ const SettingsTab = () => {
             )}
           </div>
 
+          {/* Auto-Escalation */}
+          <div
+            className={`space-y-4 rounded-lg border p-4 ${!isEnabled ? "pointer-events-none opacity-50" : ""}`}
+          >
+            <div className="mb-2 flex items-start gap-3">
+              <div className="rounded-lg bg-purple-50 p-2 text-purple-500">
+                <ArrowUpRight className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-base font-semibold">Auto-Escalation</h4>
+                <p className="text-muted-foreground text-sm">
+                  Automatically hand off conversations to a human agent when a lead is captured
+                </p>
+              </div>
+            </div>
+            <FormField
+              control={form.control}
+              name="autoEscalateOnLeadCapture"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between">
+                  <div className="space-y-0.5">
+                    <FormLabel className="font-normal">
+                      Auto-escalate on lead capture
+                    </FormLabel>
+                    <FormDescription>
+                      When enabled, the conversation will automatically be escalated to a human agent after a lead submits their contact information
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={!isEnabled}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+
           <Button
             type="submit"
             disabled={loading}
@@ -929,7 +1380,12 @@ const SettingsTab = () => {
         </form>
       </Form>
     </div>
+    {/* Live preview pane */}
+    <div className="hidden xl:block w-80 shrink-0 sticky top-6 self-start">
+      <LeadFormPreview values={previewValues} />
+    </div>
+    </div>
   );
 };
-
+ 
 export default SettingsTab;

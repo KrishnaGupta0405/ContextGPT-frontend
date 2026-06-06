@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { PanelNavbar } from "@/components/navbar/PanelNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,11 +40,13 @@ import {
   Pen,
 } from "lucide-react";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useChattingSocket } from "@/context/ChattingSocketContext";
 import api from "@/lib/axios";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import LoadingBar from "react-top-loading-bar";
 import { AddFilesModal } from "./AddFilesModal";
+import SelectionBar from "@/components/SelectionBar";
 
 const TABS = [
   {
@@ -79,6 +81,7 @@ const TABS = [
 
 const WebsiteFiles = () => {
   const { selectedChatbot } = useChatbot();
+  const { send, addListener, isConnected } = useChattingSocket() || {};
   const [activeTab, setActiveTab] = useState("total");
   const [files, setFiles] = useState([]);
   const [selectedfiles, setSelectedfiles] = useState([]);
@@ -95,6 +98,36 @@ const WebsiteFiles = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [isAddFileModalOpen, setIsAddFileModalOpen] = useState(false);
+
+  // Show toast when redirected back after a successful OAuth connection
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const providers = {
+      box: "Box",
+      notion: "Notion",
+      google_drive: "Google Drive",
+      dropbox: "Dropbox",
+      onedrive: "OneDrive",
+      github: "GitHub",
+      mega: "MEGA",
+      icloud: "iCloud Drive",
+      confluence: "Confluence",
+      sharepoint: "SharePoint",
+      gitbook: "GitBook",
+    };
+    const url = new URL(window.location.href);
+    let matched = false;
+    for (const [key, label] of Object.entries(providers)) {
+      if (params.get(key) === "connected") {
+        toast.success(`${label} connected successfully! You can now browse and add files.`);
+        url.searchParams.delete(key);
+        matched = true;
+      }
+    }
+    if (matched) {
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, []);
 
   useEffect(() => {
     let timer;
@@ -371,7 +404,9 @@ const WebsiteFiles = () => {
               st === "EMBEDDING" ||
               st === "RESYNCING" ||
               st === "DELETING" ||
-              st === "UPLOADED"
+              st === "UPLOADED" ||
+              st === "QUEUED" ||
+              st === "TPM_DEFERRED"
             ) {
               statsUpdate.pending += 1;
             }
@@ -403,6 +438,49 @@ const WebsiteFiles = () => {
     fetchFiles(currentPage, activeTabConfig?.status);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChatbot, activeTab, currentPage]);
+
+  // Keep a ref to the latest fetchFiles params so the socket handler isn't stale
+  const activeTabRef = React.useRef(activeTab);
+  const currentPageRef = React.useRef(currentPage);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+  useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+
+  // Subscribe to real-time ingestion status updates via WebSocket
+  useEffect(() => {
+    const chatbotId = selectedChatbot?.id || selectedChatbot?.chatbotId;
+    if (!chatbotId || !send || !addListener) return;
+
+    // Tell the WS server we want ingestion updates for this chatbot
+    send({ type: "subscribe:ingestion", chatbotId });
+
+    const unsub = addListener("ingestion:status", (data) => {
+      if (data.chatbotId !== chatbotId) return;
+
+      setFiles((prev) => {
+        const exists = prev.some((f) => f.id === data.fileId);
+        if (!exists) {
+          // New file added from an external source — reload the list
+          const activeTabConfig = TABS.find((t) => t.id === activeTabRef.current);
+          fetchFiles(currentPageRef.current, activeTabConfig?.status);
+          return prev;
+        }
+        return prev.map((f) =>
+          f.id === data.fileId
+            ? {
+                ...f,
+                status: data.status,
+                updatedAt: new Date().toISOString(),
+                ...(data.deferAttempts != null && { deferAttempts: data.deferAttempts }),
+                ...(data.maxDeferAttempts != null && { maxDeferAttempts: data.maxDeferAttempts }),
+              }
+            : f
+        );
+      });
+    });
+
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChatbot, isConnected, send, addListener]);
 
   const handleTabChange = (tabId) => {
     if (activeTab === tabId) return;
@@ -901,6 +979,39 @@ const WebsiteFiles = () => {
                                 </Tooltip>
                               );
                             }
+                            if (st === "QUEUED") {
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className="cursor-help border-slate-200 bg-white font-medium text-slate-500 hover:bg-white">
+                                      Queued
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="border-none bg-[#222222] text-white">
+                                    <p>File is queued for processing</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            }
+                            if (st === "TPM_DEFERRED") {
+                              const attempt = file.deferAttempts ?? 1;
+                              const max = file.maxDeferAttempts ?? 5;
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge
+                                      variant="outline"
+                                      className="cursor-help border-violet-200 bg-white font-medium text-violet-500 hover:bg-white"
+                                    >
+                                      Retrying {attempt}/{max}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="border-none bg-[#222222] text-white">
+                                    <p>Embedding capacity limit hit. Auto-retrying ({attempt} of {max} attempts).</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            }
                             if (st === "FAILED") {
                               return (
                                 <Tooltip>
@@ -1003,6 +1114,13 @@ const WebsiteFiles = () => {
           </div>
         </div>
       </div>
+      <SelectionBar
+        selectedCount={selectedfiles.length}
+        onResync={() => handleResyncLink(selectedfiles)}
+        onDelete={() => handleDeleteLink(selectedfiles)}
+        onClearSelection={() => setSelectedfiles([])}
+        loading={loading}
+      />
       <AddFilesModal
         isOpen={isAddFileModalOpen}
         onClose={setIsAddFileModalOpen}

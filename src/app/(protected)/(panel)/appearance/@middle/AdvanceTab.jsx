@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/context/AuthContext";
 import { useChatbot } from "@/context/ChatbotContext";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
+import { Textarea } from "@/components/ui/textarea";
 import { PlayCircle } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/axios";
@@ -14,6 +16,7 @@ import api from "@/lib/axios";
 const AdvanceTab = () => {
   const { account } = useAuth();
   const { selectedChatbot } = useChatbot();
+  const { markDirty, markClean } = useUnsavedChanges();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -29,6 +32,8 @@ const AdvanceTab = () => {
     hideHomePage: false,
     stayOnHomePage: false,
     requireTermsAcceptance: false,
+    termsText: "",
+    hideTermsAfterAcceptance: false,
     disclaimerText: "",
     autoOpenChatDesktop: false,
     autoOpenChatDesktopDelay: 3,
@@ -38,20 +43,23 @@ const AdvanceTab = () => {
   });
 
   useEffect(() => {
+    return () => markClean();
+  }, [markClean]);
+
+  useEffect(() => {
     if (account?.id && selectedChatbot?.id) {
-      fetchBehavior();
+      fetchSettings();
     }
   }, [account?.id, selectedChatbot?.id]);
 
-  const fetchBehavior = async () => {
+  const fetchSettings = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get(
-        `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/behavior`,
-      );
-      if (response.data.success && response.data.data) {
+      const behaviorRes = await api.get(`/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/behavior`).catch(() => null);
+
+      if (behaviorRes?.data?.success && behaviorRes.data.data) {
         setHasExistingSettings(true);
-        const data = response.data.data;
+        const data = behaviorRes.data.data;
         setFormData({
           hideSources: data.hideSources ?? false,
           hideTooltip: data.hideTooltip ?? false,
@@ -62,6 +70,8 @@ const AdvanceTab = () => {
           hideHomePage: data.hideHomePage ?? false,
           stayOnHomePage: data.stayOnHomePage ?? false,
           requireTermsAcceptance: data.requireTermsAcceptance ?? false,
+          termsText: data.termsText || "",
+          hideTermsAfterAcceptance: data.hideTermsAfterAcceptance ?? false,
           disclaimerText: data.disclaimerText || "",
           autoOpenChatDesktop: data.autoOpenChatDesktop ?? false,
           autoOpenChatDesktopDelay: data.autoOpenChatDesktopDelay ?? 3,
@@ -71,12 +81,7 @@ const AdvanceTab = () => {
         });
       }
     } catch (error) {
-      if (error.response && error.response.status === 404) {
-        setHasExistingSettings(false);
-      } else {
-        console.error("Failed to fetch behavior settings:", error);
-        toast.error("Failed to load behavior settings.");
-      }
+      console.error("Failed to fetch settings:", error);
     } finally {
       setIsLoading(false);
     }
@@ -84,6 +89,7 @@ const AdvanceTab = () => {
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    markDirty();
   };
 
   const handleSave = async () => {
@@ -91,32 +97,19 @@ const AdvanceTab = () => {
 
     setIsSaving(true);
     try {
-      let response;
-      if (hasExistingSettings) {
-        response = await api.patch(
-          `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/behavior`,
-          formData,
-        );
-      } else {
-        response = await api.post(
-          `/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/behavior`,
-          formData,
-        );
+      const behaviorRes = hasExistingSettings
+        ? await api.patch(`/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/behavior`, formData)
+        : await api.post(`/chatbots/account/${account.id}/chatbot/${selectedChatbot.id}/behavior`, formData);
+
+      if (behaviorRes.data.success) {
+        setHasExistingSettings(true);
+        markClean();
       }
 
-      if (response.data.success) {
-        toast.success(
-          response.data.message || "Behavior settings saved successfully",
-        );
-        setHasExistingSettings(true);
-      } else {
-        toast.error(response.data.message || "Failed to save settings");
-      }
+      toast.success("Settings saved successfully");
     } catch (error) {
-      console.error("Failed to save behavior settings:", error);
-      toast.error(
-        error.response?.data?.message || "An error occurred while saving.",
-      );
+      console.error("Failed to save settings:", error);
+      toast.error(error.response?.data?.message || "An error occurred while saving.");
     } finally {
       setIsSaving(false);
     }
@@ -127,7 +120,7 @@ const AdvanceTab = () => {
       <div className="flex shrink-0 items-center justify-between border-b pb-6">
         <div className="flex items-center gap-4">
           <h1 className="text-[28px] font-bold tracking-tight text-slate-900">
-            Advanced Behavior
+            Advanced
           </h1>
           <Button
             variant="outline"
@@ -154,119 +147,96 @@ const AdvanceTab = () => {
         </div>
       ) : (
         <div className="space-y-12 pb-10">
-          {/* Widget Visibility & Features */}
+          {/* Widget Visibility */}
           <section className="space-y-6">
             <div>
               <h2 className="text-xl font-bold text-slate-900">
-                Widget Features
+                Widget Visibility
               </h2>
               <p className="text-sm text-slate-500">
-                Toggle various UI elements in the chatbot widget.
+                Show or hide specific UI elements inside the chat widget.
               </p>
             </div>
 
-            <div className="max-w-3xl space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="max-w-3xl space-y-0 rounded-lg border border-slate-200 bg-white shadow-sm divide-y divide-slate-100">
+              <div className="flex items-center justify-between px-5 py-3">
                 <div className="space-y-0.5">
-                  <Label className="font-semibold text-slate-700">
-                    Hide Sources
-                  </Label>
+                  <Label className="font-semibold text-slate-700">Hide Sources</Label>
                   <p className="text-[13px] text-slate-500">
                     Do not show source links along with chatbot responses.
                   </p>
                 </div>
                 <Switch
                   checked={formData.hideSources}
-                  onCheckedChange={(val) =>
-                    handleInputChange("hideSources", val)
-                  }
+                  onCheckedChange={(val) => handleInputChange("hideSources", val)}
                 />
               </div>
 
-              <div className="flex items-center justify-between border-b border-slate-100 py-4">
+              <div className="flex items-center justify-between px-5 py-3">
                 <div className="space-y-0.5">
-                  <Label className="font-semibold text-slate-700">
-                    Hide Tooltip
-                  </Label>
+                  <Label className="font-semibold text-slate-700">Hide Tooltip</Label>
                   <p className="text-[13px] text-slate-500">
                     Disable the welcome tooltip bubble on initial load.
                   </p>
                 </div>
                 <Switch
                   checked={formData.hideTooltip}
-                  onCheckedChange={(val) =>
-                    handleInputChange("hideTooltip", val)
-                  }
+                  onCheckedChange={(val) => handleInputChange("hideTooltip", val)}
                 />
               </div>
 
-              <div className="flex items-center justify-between border-b border-slate-100 py-4">
+              <div className="flex items-center justify-between px-5 py-3">
                 <div className="space-y-0.5">
-                  <Label className="font-semibold text-slate-700">
-                    Hide Feedback Buttons
-                  </Label>
+                  <Label className="font-semibold text-slate-700">Hide Feedback Buttons</Label>
                   <p className="text-[13px] text-slate-500">
                     Remove the thumbs up/down buttons on messages.
                   </p>
                 </div>
                 <Switch
                   checked={formData.hideFeedbackButtons}
-                  onCheckedChange={(val) =>
-                    handleInputChange("hideFeedbackButtons", val)
-                  }
+                  onCheckedChange={(val) => handleInputChange("hideFeedbackButtons", val)}
                 />
               </div>
 
-              <div className="flex items-center justify-between border-b border-slate-100 py-4">
+              <div className="flex items-center justify-between px-5 py-3">
                 <div className="space-y-0.5">
-                  <Label className="font-semibold text-slate-700">
-                    Hide Bottom Navigation
-                  </Label>
+                  <Label className="font-semibold text-slate-700">Hide Bottom Navigation</Label>
                   <p className="text-[13px] text-slate-500">
-                    Remove the footer navigation area in the widget.
+                    Turn this on to hide the bottom navigation (Home, Messages, Account tabs) in the chat widget.
                   </p>
                 </div>
                 <Switch
                   checked={formData.hideBottomNavigation}
-                  onCheckedChange={(val) =>
-                    handleInputChange("hideBottomNavigation", val)
-                  }
+                  onCheckedChange={(val) => handleInputChange("hideBottomNavigation", val)}
                 />
               </div>
 
-              <div className="flex items-center justify-between border-b border-slate-100 py-4">
+              <div className="flex items-center justify-between px-5 py-3">
                 <div className="space-y-0.5">
-                  <Label className="font-semibold text-slate-700">
-                    Hide Refresh Button
-                  </Label>
+                  <Label className="font-semibold text-slate-700">Hide Refresh Button</Label>
                   <p className="text-[13px] text-slate-500">
-                    Disable the user's ability to reset the chat session.
+                    Turn this on to hide the refresh button in the chat widget header.
                   </p>
                 </div>
                 <Switch
                   checked={formData.hideRefreshButton}
-                  onCheckedChange={(val) =>
-                    handleInputChange("hideRefreshButton", val)
-                  }
+                  onCheckedChange={(val) => handleInputChange("hideRefreshButton", val)}
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-4">
+              <div className="flex items-center justify-between px-5 py-3">
                 <div className="space-y-0.5">
-                  <Label className="font-semibold text-slate-700">
-                    Hide Expand Button
-                  </Label>
+                  <Label className="font-semibold text-slate-700">Hide Expand Button</Label>
                   <p className="text-[13px] text-slate-500">
-                    Remove the fullscreen toggle button.
+                    Turn this on to hide the expand button in the chat widget header.
                   </p>
                 </div>
                 <Switch
                   checked={formData.hideExpandButton}
-                  onCheckedChange={(val) =>
-                    handleInputChange("hideExpandButton", val)
-                  }
+                  onCheckedChange={(val) => handleInputChange("hideExpandButton", val)}
                 />
               </div>
+
             </div>
           </section>
 
@@ -388,72 +358,93 @@ const AdvanceTab = () => {
               </p>
             </div>
 
-            <div className="max-w-3xl space-y-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-5">
+            <div className="max-w-3xl space-y-0 rounded-lg border border-slate-200 bg-white shadow-sm divide-y divide-slate-100">
+              <div className="flex items-center justify-between px-5 py-3">
                 <div className="space-y-0.5">
-                  <Label className="font-semibold text-slate-700">
-                    Hide Home Page
-                  </Label>
+                  <Label className="font-semibold text-slate-700">Hide Home Page</Label>
                   <p className="text-[13px] text-slate-500">
-                    Skips the default home page in the widget and goes straight
-                    to chat.
+                    Turn this on to hide the home page. The back button will be replaced with a button to start a new conversation.
                   </p>
                 </div>
                 <Switch
                   checked={formData.hideHomePage}
-                  onCheckedChange={(val) =>
-                    handleInputChange("hideHomePage", val)
-                  }
+                  onCheckedChange={(val) => handleInputChange("hideHomePage", val)}
                 />
               </div>
 
-              <div className="flex items-center justify-between border-b border-slate-100 pb-5">
+              <div className="flex items-center justify-between px-5 py-3">
                 <div className="space-y-0.5">
-                  <Label className="font-semibold text-slate-700">
-                    Stay On Home Page
-                  </Label>
+                  <Label className="font-semibold text-slate-700">Stay on Home Page (No Auto-Redirect)</Label>
                   <p className="text-[13px] text-slate-500">
-                    If enabled, closing the chat returns back to home page
-                    instead of history.
+                    When enabled, users will stay on the home page when there&apos;s no existing conversation, instead of automatically creating a new conversation and redirecting.
                   </p>
                 </div>
                 <Switch
                   checked={formData.stayOnHomePage}
-                  onCheckedChange={(val) =>
-                    handleInputChange("stayOnHomePage", val)
-                  }
+                  onCheckedChange={(val) => handleInputChange("stayOnHomePage", val)}
                 />
               </div>
 
-              <div className="flex items-center justify-between py-2">
+              <div className="flex items-center justify-between px-5 py-3">
                 <div className="space-y-0.5">
-                  <Label className="font-semibold text-slate-700">
-                    Require Terms Acceptance
-                  </Label>
+                  <Label className="font-semibold text-slate-700">Require Terms Acceptance</Label>
                   <p className="text-[13px] text-slate-500">
-                    Users must agree to terms to start chatting.
+                    When enabled, users must check a checkbox agreeing to your terms before they can start a conversation.
                   </p>
-                </div>
+                </div> 
                 <Switch
                   checked={formData.requireTermsAcceptance}
-                  onCheckedChange={(val) =>
-                    handleInputChange("requireTermsAcceptance", val)
-                  }
+                  onCheckedChange={(val) => handleInputChange("requireTermsAcceptance", val)}
                 />
               </div>
 
-              <div className="space-y-1.5 pt-3">
+              {formData.requireTermsAcceptance && (
+                <>
+                  <div className="space-y-1.5 px-5 py-4">
+                    <Label className="font-semibold text-slate-700">
+                      Terms Text (Markdown)
+                    </Label>
+                    <Textarea
+                      value={formData.termsText}
+                      onChange={(e) => handleInputChange("termsText", e.target.value)}
+                      placeholder="By continuing, you agree to our [Terms of Service](https://example.com/terms) and [Privacy Policy](https://example.com/privacy)."
+                      className="min-h-[80px] w-full resize-y"
+                    />
+                    <p className="text-[13px] text-slate-500">
+                      Supports markdown. Use [link text](url) to add clickable links.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between px-5 py-3">
+                    <div className="space-y-0.5">
+                      <Label className="font-semibold text-slate-700">Hide Terms After Acceptance</Label>
+                      <p className="text-[13px] text-slate-500">
+                        When enabled, the terms checkbox will be hidden after the user accepts it during the session.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={formData.hideTermsAfterAcceptance}
+                      onCheckedChange={(val) => handleInputChange("hideTermsAfterAcceptance", val)}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-1.5 px-5 py-4">
                 <Label className="font-semibold text-slate-700">
                   Disclaimer / Terms Text
                 </Label>
-                <textarea
+                <Textarea
                   value={formData.disclaimerText}
                   onChange={(e) =>
                     handleInputChange("disclaimerText", e.target.value)
                   }
                   placeholder="By continuing, you agree to our Terms..."
-                  className="min-h-[80px] w-full resize-none rounded-md border border-slate-200 p-3 text-sm shadow-sm focus:ring-1 focus:ring-slate-900 focus:outline-none"
+                  className="min-h-[80px] w-full resize-y"
                 />
+                <p className="text-[13px] text-slate-500">
+                  Optional text shown below the message input. Always visible, no checkbox required. Supports markdown.
+                </p>
               </div>
             </div>
           </section>

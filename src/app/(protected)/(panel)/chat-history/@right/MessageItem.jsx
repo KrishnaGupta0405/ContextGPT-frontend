@@ -9,6 +9,20 @@ import { Badge } from "@/components/ui/badge";
 const MessageItem = ({ message, threadDetails, onEdit }) => {
   const [showSources, setShowSources] = useState(false);
   const isUser = message.role === "user" || message.role === "USER";
+  const isSystem = message.role === "SYSTEM";
+
+  // ── System messages: render as centered divider ──
+  if (isSystem) {
+    return (
+      <div className="flex w-full items-center justify-center py-2">
+        <div className="border-muted-foreground/30 bg-muted/40 flex items-center gap-2 rounded-full border border-dashed px-4 py-1.5">
+          <span className="text-muted-foreground text-center text-[11px] leading-snug italic">
+            {message.content}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   let avatarSrc = "";
   if (message.role === "AGENT") {
