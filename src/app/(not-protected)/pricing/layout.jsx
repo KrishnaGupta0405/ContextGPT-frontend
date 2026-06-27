@@ -2,14 +2,14 @@ export const metadata = {
   title: "ContextGPT | Pricing",
   description: "Simple, transparent pricing for every team size. Start free, upgrade as you grow. No hidden fees.",
   keywords: ["ContextGPT pricing", "AI chatbot pricing", "chatbot plans", "free chatbot plan"],
-  alternates: { canonical: "https://contextgpt.com/pricing" },
+  alternates: { canonical: "https://contextgpt.in/pricing" },
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "ContextGPT",
     title: "ContextGPT | Pricing",
     description: "Simple, transparent pricing for every team size. Start free, upgrade as you grow.",
-    url: "https://contextgpt.com/pricing",
+    url: "https://contextgpt.in/pricing",
     images: [{ url: "/icons/Contextgpt_icon.svg", width: 1200, height: 630, alt: "ContextGPT Pricing" }],
   },
   twitter: {

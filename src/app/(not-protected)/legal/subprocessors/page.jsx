@@ -4,14 +4,14 @@ import { cn } from "@/lib/utils";
 export const metadata = {
   title: "ContextGPT | Subprocessors",
   description: "List of third-party subprocessors used by ContextGPT to deliver its services.",
-  alternates: { canonical: "https://contextgpt.com/legal/subprocessors" },
+  alternates: { canonical: "https://contextgpt.in/legal/subprocessors" },
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "ContextGPT",
     title: "ContextGPT | Subprocessors",
     description: "List of third-party subprocessors used by ContextGPT.",
-    url: "https://contextgpt.com/legal/subprocessors",
+    url: "https://contextgpt.in/legal/subprocessors",
   },
 };
 

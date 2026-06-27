@@ -5,14 +5,14 @@ import { SupportEmail, AdminEmail, SUPPORT_EMAIL } from "@/components/constraint
 export const metadata = {
   title: "ContextGPT | Terms & Conditions",
   description: "Read ContextGPT's Terms & Conditions — the rules governing use of our platform and services.",
-  alternates: { canonical: "https://contextgpt.com/legal/terms" },
+  alternates: { canonical: "https://contextgpt.in/legal/terms" },
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "ContextGPT",
     title: "ContextGPT | Terms & Conditions",
     description: "Read ContextGPT's Terms & Conditions.",
-    url: "https://contextgpt.com/legal/terms",
+    url: "https://contextgpt.in/legal/terms",
   },
 };
 

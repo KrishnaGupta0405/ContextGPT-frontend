@@ -5,14 +5,14 @@ import { SUPPORT_EMAIL } from "@/components/constraint";
 export const metadata = {
   title: "ContextGPT | Contact Us",
   description: "Get in touch with the ContextGPT team — support, sales, or partnerships.",
-  alternates: { canonical: "https://contextgpt.com/contact" },
+  alternates: { canonical: "https://contextgpt.in/contact" },
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "ContextGPT",
     title: "ContextGPT | Contact Us",
     description: "Get in touch with the ContextGPT team — support, sales, or partnerships.",
-    url: "https://contextgpt.com/contact",
+    url: "https://contextgpt.in/contact",
     images: [{ url: "/icons/Contextgpt_icon.svg", width: 1200, height: 630, alt: "Contact ContextGPT" }],
   },
   twitter: {

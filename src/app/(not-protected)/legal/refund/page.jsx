@@ -4,14 +4,14 @@ import { SUPPORT_EMAIL } from "@/components/constraint";
 export const metadata = {
   title: "ContextGPT | Refund Policy",
   description: "Read ContextGPT's refund policy — understand your rights and how to request a refund.",
-  alternates: { canonical: "https://contextgpt.com/legal/refund" },
+  alternates: { canonical: "https://contextgpt.in/legal/refund" },
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "ContextGPT",
     title: "ContextGPT | Refund Policy",
     description: "Read ContextGPT's refund policy.",
-    url: "https://contextgpt.com/legal/refund",
+    url: "https://contextgpt.in/legal/refund",
   },
 };
 

@@ -4,14 +4,14 @@ export const metadata = {
   title: "ContextGPT | Security",
   description: "Learn how ContextGPT keeps your data secure with enterprise-grade encryption, access controls, and compliance practices.",
   keywords: ["AI chatbot security", "data security", "GDPR chatbot", "enterprise security", "data encryption"],
-  alternates: { canonical: "https://contextgpt.com/security" },
+  alternates: { canonical: "https://contextgpt.in/security" },
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "ContextGPT",
     title: "ContextGPT | Security",
     description: "Enterprise-grade security — encryption, access controls, and compliance built into every layer.",
-    url: "https://contextgpt.com/security",
+    url: "https://contextgpt.in/security",
     images: [{ url: "/icons/Contextgpt_icon.svg", width: 1200, height: 630, alt: "ContextGPT Security" }],
   },
   twitter: {

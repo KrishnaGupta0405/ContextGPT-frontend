@@ -1,7 +1,7 @@
 export const metadata = {
   title: "ContextGPT | Data Processing Agreement",
   description: "ContextGPT Data Processing Agreement (DPA) for GDPR and data privacy compliance.",
-  alternates: { canonical: "https://contextgpt.com/legal/dpa" },
+  alternates: { canonical: "https://contextgpt.in/legal/dpa" },
   robots: { index: false, follow: false },
   openGraph: {
     type: "website",
@@ -9,7 +9,7 @@ export const metadata = {
     siteName: "ContextGPT",
     title: "ContextGPT | Data Processing Agreement",
     description: "ContextGPT Data Processing Agreement (DPA) for GDPR and data privacy compliance.",
-    url: "https://contextgpt.com/legal/dpa",
+    url: "https://contextgpt.in/legal/dpa",
   },
 };
 

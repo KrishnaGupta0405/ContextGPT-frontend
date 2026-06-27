@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  metadataBase: new URL("https://contextgpt.com"),
+  metadataBase: new URL("https://contextgpt.in"),
   manifest: "/manifest.json",
   title: {
     default: "ContextGPT | AI Chatbot for Your Website",
@@ -23,7 +23,7 @@ export const metadata = {
   },
   description: "Turn your website into an AI chatbot in minutes. Train on your content, capture leads, and answer questions 24/7.",
   keywords: ["AI chatbot", "website chatbot", "customer support AI", "lead generation chatbot", "no-code chatbot"],
-  authors: [{ name: "ContextGPT", url: "https://contextgpt.com" }],
+  authors: [{ name: "ContextGPT", url: "https://contextgpt.in" }],
   creator: "ContextGPT",
   publisher: "ContextGPT",
   icons: {
@@ -62,22 +62,22 @@ const siteSchema = {
     {
       "@type": "Organization",
       name: "ContextGPT",
-      url: "https://contextgpt.com",
-      logo: "https://contextgpt.com/icons/Contextgpt_icon.svg",
+      url: "https://contextgpt.in",
+      logo: "https://contextgpt.in/icons/Contextgpt_icon.svg",
       sameAs: [],
       contactPoint: {
         "@type": "ContactPoint",
         contactType: "customer support",
-        url: "https://contextgpt.com/contact",
+        url: "https://contextgpt.in/contact",
       },
     },
     {
       "@type": "WebSite",
       name: "ContextGPT",
-      url: "https://contextgpt.com",
+      url: "https://contextgpt.in",
       potentialAction: {
         "@type": "SearchAction",
-        target: "https://contextgpt.com/search?q={search_term_string}",
+        target: "https://contextgpt.in/search?q={search_term_string}",
         "query-input": "required name=search_term_string",
       },
     },
@@ -89,7 +89,7 @@ const siteSchema = {
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
       description:
         "Turn your website into an AI chatbot in minutes. Train on your content, capture leads, and answer questions 24/7.",
-      url: "https://contextgpt.com",
+      url: "https://contextgpt.in",
     },
   ],
 };

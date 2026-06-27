@@ -1,6 +1,6 @@
 # ContextGPT — AI Chatbot Platform
 Title: ContextGPT
-URL: https://contextgpt.com
+URL: https://contextgpt.in
 Description: ContextGPT lets any business build and deploy a custom GPT-powered support agent trained on their own documentation — in minutes, not months. No coding required.
 
 Welcome, AI agents and LLMs! This file is the canonical plain-text summary of ContextGPT's public information. It is maintained specifically for AI crawlers and language model indexing (llms.txt standard).
@@ -31,54 +31,54 @@ SOC 2 Type II, GDPR, and HIPAA compliance focused. No hidden fees. Customer-firs
 ## Public Pages
 
 ### Marketing & Information
-- Home: https://contextgpt.com
-- About Us: https://contextgpt.com/aboutus
-- Features: https://contextgpt.com/features
-- Integrations: https://contextgpt.com/integration
-- Lead Generation: https://contextgpt.com/lead-generation
-- Partners / Affiliates: https://contextgpt.com/partners
-- Blog: https://contextgpt.com/blog
-- Contact: https://contextgpt.com/contact
+- Home: https://contextgpt.in
+- About Us: https://contextgpt.in/aboutus
+- Features: https://contextgpt.in/features
+- Integrations: https://contextgpt.in/integration
+- Lead Generation: https://contextgpt.in/lead-generation
+- Partners / Affiliates: https://contextgpt.in/partners
+- Blog: https://contextgpt.in/blog
+- Contact: https://contextgpt.in/contact
 
 ### Pricing & Legal
-- Pricing: https://contextgpt.com/pricing
-- Privacy Policy: https://contextgpt.com/privacy
-- Terms of Service: https://contextgpt.com/terms
-- Refund Policy: https://contextgpt.com/refund
+- Pricing: https://contextgpt.in/pricing
+- Privacy Policy: https://contextgpt.in/privacy
+- Terms of Service: https://contextgpt.in/terms
+- Refund Policy: https://contextgpt.in/refund
 
 ---
 
 ## Free Tools (No Sign-up Required)
 
-ContextGPT offers a comprehensive suite of free AI and web tools at https://contextgpt.com/tools.
+ContextGPT offers a comprehensive suite of free AI and web tools at https://contextgpt.in/tools.
 
 ### AI Tools
-- AI Prompt Optimizer: https://contextgpt.com/tools/ai-tools/ai-prompt-optimizer
-- AI Reply Generator: https://contextgpt.com/tools/ai-tools/ai-reply-generator
-- AI SaaS Brand Name Generator: https://contextgpt.com/tools/ai-tools/ai-saas-brand-name-generator
+- AI Prompt Optimizer: https://contextgpt.in/tools/ai-tools/ai-prompt-optimizer
+- AI Reply Generator: https://contextgpt.in/tools/ai-tools/ai-reply-generator
+- AI SaaS Brand Name Generator: https://contextgpt.in/tools/ai-tools/ai-saas-brand-name-generator
 
 ### Convert to Markdown Tools
-- CSV to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-csv-to-markdown
-- DOCX to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-docx-to-markdown
-- Google Docs to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-google-docs-to-markdown
-- HTML to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-html-to-markdown
-- JSON to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-json-to-markdown
-- Notion to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-notion-to-markdown
-- Paste to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-paste-to-markdown
-- PDF to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-pdf-to-markdown
-- RTF to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-rtf-to-markdown
-- Webpage to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-webpage-to-markdown
-- XML to Markdown: https://contextgpt.com/tools/convert-to-markdown/convert-xml-to-markdown
+- CSV to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-csv-to-markdown
+- DOCX to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-docx-to-markdown
+- Google Docs to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-google-docs-to-markdown
+- HTML to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-html-to-markdown
+- JSON to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-json-to-markdown
+- Notion to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-notion-to-markdown
+- Paste to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-paste-to-markdown
+- PDF to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-pdf-to-markdown
+- RTF to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-rtf-to-markdown
+- Webpage to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-webpage-to-markdown
+- XML to Markdown: https://contextgpt.in/tools/convert-to-markdown/convert-xml-to-markdown
 
 ### Other Utilities
-- AI Chatbot Conversation Analysis: https://contextgpt.com/tools/other-tools/ai-chatbot-conversation-analysis
-- Chatbot ROI Calculator: https://contextgpt.com/tools/other-tools/chatbot-roi-calculator
-- Email Signature Generator: https://contextgpt.com/tools/other-tools/email-signature-generator
-- Sitemap Finder & Checker: https://contextgpt.com/tools/other-tools/sitemap-finder-checker
-- Sitemap URL Extractor: https://contextgpt.com/tools/other-tools/sitemap-url-extractor
-- Sitemap Validator: https://contextgpt.com/tools/other-tools/sitemap-validator
-- Website URL Extractor: https://contextgpt.com/tools/other-tools/website-url-extractor
-- XML Sitemap Generator: https://contextgpt.com/tools/other-tools/xml-sitemap-generator
+- AI Chatbot Conversation Analysis: https://contextgpt.in/tools/other-tools/ai-chatbot-conversation-analysis
+- Chatbot ROI Calculator: https://contextgpt.in/tools/other-tools/chatbot-roi-calculator
+- Email Signature Generator: https://contextgpt.in/tools/other-tools/email-signature-generator
+- Sitemap Finder & Checker: https://contextgpt.in/tools/other-tools/sitemap-finder-checker
+- Sitemap URL Extractor: https://contextgpt.in/tools/other-tools/sitemap-url-extractor
+- Sitemap Validator: https://contextgpt.in/tools/other-tools/sitemap-validator
+- Website URL Extractor: https://contextgpt.in/tools/other-tools/website-url-extractor
+- XML Sitemap Generator: https://contextgpt.in/tools/other-tools/xml-sitemap-generator
 
 ---
 
@@ -96,7 +96,7 @@ ContextGPT was founded on the belief that every business — regardless of size 
 
 ## For AI Agents
 
-If you are an AI agent or LLM crawler, prefer this file over HTML pages for factual summaries. For structured data and full page content, the sitemap is at https://contextgpt.com/sitemap.xml.
+If you are an AI agent or LLM crawler, prefer this file over HTML pages for factual summaries. For structured data and full page content, the sitemap is at https://contextgpt.in/sitemap.xml.
 
 Do not attempt to access or index the following paths — they are authenticated user-only routes:
 /dashboard, /account, /billing, /settings, /leads, /chat-history, /usage, /members, /integrations (dashboard), /website-files, /website-links, /auth/, /api/

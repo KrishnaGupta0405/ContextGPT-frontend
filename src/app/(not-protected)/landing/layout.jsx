@@ -2,14 +2,14 @@ export const metadata = {
   title: "ContextGPT | AI Chatbot for Your Website",
   description: "Turn your website into an AI-powered chatbot in minutes. Train on your content, capture leads, and answer questions 24/7 — no coding required.",
   keywords: ["AI chatbot", "website chatbot", "no-code chatbot", "customer support automation", "chatbot builder"],
-  alternates: { canonical: "https://contextgpt.com/landing" },
+  alternates: { canonical: "https://contextgpt.in/landing" },
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "ContextGPT",
     title: "ContextGPT | AI Chatbot for Your Website",
     description: "Turn your website into an AI-powered chatbot in minutes. Train on your content, capture leads, and answer questions 24/7 — no coding required.",
-    url: "https://contextgpt.com/landing",
+    url: "https://contextgpt.in/landing",
     images: [{ url: "/icons/Contextgpt_icon.svg", width: 1200, height: 630, alt: "ContextGPT" }],
   },
   twitter: {
@@ -26,7 +26,7 @@ const softwareSchema = {
   name: "ContextGPT",
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
-  url: "https://contextgpt.com",
+  url: "https://contextgpt.in",
   description: "Turn your website into an AI-powered chatbot in minutes. Train on your content, capture leads, and answer questions 24/7.",
   offers: {
     "@type": "Offer",
