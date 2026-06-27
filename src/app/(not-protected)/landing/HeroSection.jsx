@@ -17,7 +17,8 @@ export default function HeroSection() {
     // Embedded hero widget
     const embedded = document.createElement("script");
     embedded.type = "module";
-    embedded.src = "https://contextgpt-widget-testing.vercel.app/loader.js?instance=embedded-hero&chatbotId=27df3d37-8395-4d1f-a084-5609237ae367&server=http%3A%2F%2Flocalhost%3A9000&mode=embedded&container=%23contextgpt-hero-container";
+    // removed the data-server tag from the src URL.
+    embedded.src = "https://contextgpt-widget-testing.vercel.app/loader.js?instance=embedded-hero&chatbotId=27df3d37-8395-4d1f-a084-5609237ae367&mode=embedded&container=%23contextgpt-hero-container";
     embedded.setAttribute("data-chatbot-id", "27df3d37-8395-4d1f-a084-5609237ae367");
     // embedded.setAttribute("data-server", "http://localhost:9000");
     embedded.setAttribute("data-mode", "embedded");
@@ -34,7 +35,7 @@ export default function HeroSection() {
     if (!floatingAlreadyExists) {
       floating = document.createElement("script");
       floating.type = "module";
-      floating.src = "https://contextgpt-widget-testing.vercel.app/loader.js?instance=floating&chatbotId=27df3d37-8395-4d1f-a084-5609237ae367&server=http%3A%2F%2Flocalhost%3A9000";
+      floating.src = "https://contextgpt-widget-testing.vercel.app/loader.js?instance=floating&chatbotId=27df3d37-8395-4d1f-a084-5609237ae367";
       floating.setAttribute("data-chatbot-id", "27df3d37-8395-4d1f-a084-5609237ae367");
       // floating.setAttribute("data-server", "http://localhost:9000");
       floating.setAttribute("data-instance", "floating");
@@ -45,7 +46,7 @@ export default function HeroSection() {
     }
 
     return () => {
-      console.log("[HeroSection] useEffect cleanup (unmounting)");
+      // console.log("[HeroSection] useEffect cleanup (unmounting)");
       document.body.removeChild(embedded);
       if (floating) document.body.removeChild(floating);
     };
